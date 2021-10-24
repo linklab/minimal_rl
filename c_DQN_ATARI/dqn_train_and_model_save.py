@@ -116,7 +116,7 @@ class AtariCNN(nn.Module):
         return out
 
 
-class DQN(nn.Module):
+class DQN:
     def __init__(
             self, use_wandb, wandb_entity,
             max_num_episodes, batch_size, learning_rate,
@@ -124,10 +124,10 @@ class DQN(nn.Module):
             replay_buffer_size, min_buffer_size_for_training,
             epsilon_start, epsilon_end,
             epsilon_scheduled_last_episode,
+            print_episode_interval,
             test_episode_interval, test_num_episodes,
             episode_reward_avg_solved, episode_reward_std_solved
     ):
-        super().__init__()
         self.use_wandb = use_wandb
         if self.use_wandb:
             self.wandb = wandb.init(
@@ -144,6 +144,7 @@ class DQN(nn.Module):
         self.epsilon_start = epsilon_start
         self.epsilon_end = epsilon_end
         self.epsilon_scheduled_last_episode = epsilon_scheduled_last_episode
+        self.print_episode_interval = print_episode_interval
         self.test_episode_interval = test_episode_interval
         self.test_num_episodes = test_num_episodes
         self.episode_reward_avg_solved = episode_reward_avg_solved
@@ -227,7 +228,7 @@ class DQN(nn.Module):
         return epsilon
 
     def train_loop(self):
-        loss = 0
+        loss = 0.0
 
         total_train_start_time = time.time()
 
@@ -252,10 +253,10 @@ class DQN(nn.Module):
                 action, gym_action = self.get_action(observation, epsilon)
 
                 # do step in the environment
-                new_observation, reward, done, _ = self.env.step(gym_action)
+                next_observation, reward, done, _ = self.env.step(gym_action)
 
                 transition = Transition(
-                    observation, action, reward, new_observation, done
+                    observation, action, reward, next_observation, done
                 )
                 self.replay_buffer.append(transition)
 
@@ -263,7 +264,7 @@ class DQN(nn.Module):
                     loss = self.train_step()
 
                 episode_reward += reward
-                observation = new_observation
+                observation = next_observation
 
                 if done:
                     self.total_rewards.append(episode_reward)
@@ -278,21 +279,22 @@ class DQN(nn.Module):
                         '%H:%M:%S', time.gmtime(total_training_time)
                     )
 
-                    print(
-                        "[Episode {:3}, Steps {:6}]".format(
-                            n_episode, self.total_step_idx
-                        ),
-                        "Episode Reward: {:>5},".format(episode_reward),
-                        "Mean Episode Reward: {:.3f},".format(mean_episode_reward),
-                        "size of replay buffer: {:>6}".format(
-                            self.replay_buffer.size()
-                        ),
-                        "Loss: {:.3f},".format(loss),
-                        "Epsilon: {:.2f},".format(epsilon),
-                        "Num Training Steps: {:4},".format(self.training_steps),
-                        "Per-Episode Time: {}".format(per_episode_time),
-                        "Total Elapsed Time {}".format(total_training_time)
-                    )
+                    if n_episode % self.print_episode_interval == 0:
+                        print(
+                            "[Episode {:3}, Steps {:6}]".format(
+                                n_episode, self.total_step_idx
+                            ),
+                            "Episode Reward: {:>5},".format(episode_reward),
+                            "Mean Episode Reward: {:.3f},".format(mean_episode_reward),
+                            "size of replay buffer: {:>6}".format(
+                                self.replay_buffer.size()
+                            ),
+                            "Loss: {:.3f},".format(loss),
+                            "Epsilon: {:.2f},".format(epsilon),
+                            "Num Training Steps: {:4},".format(self.training_steps),
+                            "Per-Episode Time: {}".format(per_episode_time),
+                            "Total Elapsed Time {}".format(total_training_time)
+                        )
 
                     if self.training_steps > 0 and n_episode % self.test_episode_interval == 0:
                         test_episode_reward_avg, test_episode_reward_std = self.q_testing(
@@ -325,7 +327,7 @@ class DQN(nn.Module):
                             "Size of replay buffer": self.replay_buffer.size(),
                             "Epsilon": epsilon,
                             "Num Training Steps": self.training_steps,
-                            "Loss": loss.item() if loss != 0.0 else 0.0,
+                            "Loss": loss if loss != 0.0 else 0.0,
                             "[TEST] Average Episode Reward": test_episode_reward_avg,
                             "[TEST] Std. Episode Reward": test_episode_reward_std
                         })
@@ -381,10 +383,12 @@ class DQN(nn.Module):
         if self.total_step_idx % self.target_sync_step_interval == 0:
             self.target_q.load_state_dict(self.q.state_dict())
 
-        return loss
+        return loss.item()
 
     def model_save(self, test_episode_reward_avg, test_episode_reward_std):
-        print("Solved in {} frames!".format(self.total_step_idx))
+        print("Solved in {0} steps ({1} training steps)!".format(
+            self.total_step_idx, self.training_steps
+        ))
         torch.save(
             self.q.state_dict(),
             os.path.join(MODEL_DIR, "dqn_{0}_{1:4.1f}_{2:3.1f}.pth".format(
@@ -432,6 +436,7 @@ def main():
         epsilon_start=None,                     # Epsilon 초기 값
         epsilon_end=None,                       # Epsilon 최종 값
         epsilon_scheduled_last_episode=None,    # Epsilon 최종 값으로 스케줄되어지는 마지막 에피소드
+        print_episode_interval=1,               # Episode 통계 출력에 관한 에피소드 간격
         test_episode_interval=None,             # 테스트를 위한 training_step 간격
         test_num_episodes=None,                 # 테스트시에 수행하는 에피소드 횟수
         episode_reward_avg_solved=0,            # 훈련 종료를 위한 테스트 에피소드 리워드의 Average

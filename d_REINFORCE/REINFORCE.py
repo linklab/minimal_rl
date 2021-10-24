@@ -36,12 +36,12 @@ class Policy(nn.Module):
         self.optimizer.step()
         self.data = []
 
+
 def main():
     env = gym.make('CartPole-v1')
     pi = Policy()
     score = 0.0
     print_interval = 20
-    
     
     for n_epi in range(10000):
         s = env.reset()
@@ -62,6 +62,7 @@ def main():
             print("# of episode :{}, avg score : {}".format(n_epi, score/print_interval))
             score = 0.0
     env.close()
-    
+
+
 if __name__ == '__main__':
     main()
