@@ -89,16 +89,19 @@ def main_q_play(num_episodes):
     env = gym.make(ENV_NAME)
     env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=True)
     env = gym.wrappers.FrameStack(env, num_stack=4, lz4_compress=True)
+
     obs_shape = env.observation_space.shape
     n_actions = 3
     q = AtariCNN(obs_shape, n_actions).to(DEVICE)
     model_params = torch.load(
-        os.path.join(MODEL_DIR, "dqn_PongNoFrameskip-v4_ 4.0_0.0.pth")
+        os.path.join(MODEL_DIR, "dqn_PongNoFrameskip-v4_19.7_0.9.pth")
     )
     q.load_state_dict(model_params)
     play(env, q, num_episodes=num_episodes)
 
+    env.close()
+
 
 if __name__ == "__main__":
-    NUM_EPISODES = 10
+    NUM_EPISODES = 2
     main_q_play(num_episodes=NUM_EPISODES)

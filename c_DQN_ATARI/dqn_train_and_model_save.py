@@ -391,7 +391,7 @@ class DQN:
         ))
         torch.save(
             self.q.state_dict(),
-            os.path.join(MODEL_DIR, "dqn_{0}_{1:4.1f}_{2:3.1f}.pth".format(
+            os.path.join(MODEL_DIR, "dqn_{0}_{1:.1f}_{2:.1f}.pth".format(
                 ENV_NAME, test_episode_reward_avg, test_episode_reward_std
             ))
         )
