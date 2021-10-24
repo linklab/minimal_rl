@@ -26,17 +26,10 @@ os.environ['CUDA_VISIBLE_DEVICES'] = 'True'
 
 # local
 ENV_NAME = "PongNoFrameskip-v4"
-WANDB = True
 
 MODEL_DIR = os.path.join(PROJECT_HOME, "c_DQN_ATARI", "models")
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
-
-if WANDB:
-    wandb = wandb.init(
-        entity="link-koreatech",
-        project="DQN"
-    )
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -125,7 +118,8 @@ class AtariCNN(nn.Module):
 
 class DQN(nn.Module):
     def __init__(
-            self, max_num_episodes, batch_size, learning_rate,
+            self, use_wandb, wandb_entity,
+            max_num_episodes, batch_size, learning_rate,
             gamma, target_sync_step_interval,
             replay_buffer_size, min_buffer_size_for_training,
             epsilon_start, epsilon_end,
@@ -134,6 +128,12 @@ class DQN(nn.Module):
             episode_reward_avg_solved, episode_reward_std_solved
     ):
         super().__init__()
+        self.use_wandb = use_wandb
+        if self.use_wandb:
+            self.wandb = wandb.init(
+                entity=wandb_entity,
+                project="DQN_PONG"
+            )
         self.max_num_episodes = max_num_episodes
         self.batch_size = batch_size
         self.learning_rate = learning_rate
@@ -317,8 +317,8 @@ class DQN(nn.Module):
                             )
                             is_terminated = True
 
-                    if WANDB:
-                        wandb.log({
+                    if self.use_wandb:
+                        self.wandb.log({
                             "Episode": n_episode,
                             "Episode Reward": episode_reward,
                             "Mean Episode Reward": mean_episode_reward,
@@ -326,9 +326,10 @@ class DQN(nn.Module):
                             "Epsilon": epsilon,
                             "Num Training Steps": self.training_steps,
                             "Loss": loss.item() if loss != 0.0 else 0.0,
-                            "Test Average Episode Reward": test_episode_reward_avg,
-                            "Test Std. Episode Reward": test_episode_reward_std
+                            "[TEST] Average Episode Reward": test_episode_reward_avg,
+                            "[TEST] Std. Episode Reward": test_episode_reward_std
                         })
+
                     break
 
             if is_terminated:
@@ -419,6 +420,8 @@ class DQN(nn.Module):
 
 def main():
     dqn = DQN(
+        use_wandb=False,                            # WANDB 연결 및 로깅 유무
+        wandb_entity="",                        # WANDB 개인 계정
         max_num_episodes=None,                  # 훈련을 위한 최대 에피소드 횟수
         batch_size=None,                        # 훈련시 배치에서 한번에 가져오는 랜덤 배치 사이즈
         learning_rate=None,                     # 학습율
@@ -431,8 +434,8 @@ def main():
         epsilon_scheduled_last_episode=None,    # Epsilon 최종 값으로 스케줄되어지는 마지막 에피소드
         test_episode_interval=None,             # 테스트를 위한 training_step 간격
         test_num_episodes=None,                 # 테스트시에 수행하는 에피소드 횟수
-        episode_reward_avg_solved=None,         # 훈련 종료를 위한 테스트 에피소드 리워드의 Average
-        episode_reward_std_solved=None          # 훈련 종료를 위한 테스트 에피소드 리워드의 Standard Deviation
+        episode_reward_avg_solved=0,            # 훈련 종료를 위한 테스트 에피소드 리워드의 Average
+        episode_reward_std_solved=3             # 훈련 종료를 위한 테스트 에피소드 리워드의 Standard Deviation
     )
     dqn.train_loop()
 
