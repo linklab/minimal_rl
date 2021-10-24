@@ -130,7 +130,7 @@ class DQN(nn.Module):
             replay_buffer_size, min_buffer_size_for_training,
             epsilon_start, epsilon_end,
             epsilon_scheduled_last_episode,
-            test_training_step_interval, test_num_episodes,
+            test_episode_interval, test_num_episodes,
             episode_reward_avg_solved, episode_reward_std_solved
     ):
         super().__init__()
@@ -144,7 +144,7 @@ class DQN(nn.Module):
         self.epsilon_start = epsilon_start
         self.epsilon_end = epsilon_end
         self.epsilon_scheduled_last_episode = epsilon_scheduled_last_episode
-        self.test_training_step_interval = test_training_step_interval
+        self.test_episode_interval = test_episode_interval
         self.test_num_episodes = test_num_episodes
         self.episode_reward_avg_solved = episode_reward_avg_solved
         self.episode_reward_std_solved = episode_reward_std_solved
@@ -231,8 +231,8 @@ class DQN(nn.Module):
 
         total_train_start_time = time.time()
 
-        test_avg_episode_reward = -21
-        test_std_episode_reward = 0.0
+        test_episode_reward_avg = -21
+        test_episode_reward_std = 0.0
 
         is_terminated = False
 
@@ -261,25 +261,6 @@ class DQN(nn.Module):
 
                 if self.total_step_idx > self.min_buffer_size_for_training:
                     loss = self.train_step()
-
-                if self.training_steps != 0 and self.training_steps % self.test_training_step_interval == 0:
-                    test_avg_episode_reward, test_std_episode_reward = self.q_testing(
-                        self.test_num_episodes
-                    )
-
-                    termination_conditions = [
-                        test_avg_episode_reward > self.episode_reward_avg_solved,
-                        test_std_episode_reward < self.episode_reward_std_solved
-                    ]
-
-                    if all(termination_conditions):
-                        print("Solved in {0} steps ({1} training steps)!".format(
-                            self.total_step_idx, self.training_steps
-                        ))
-                        self.model_save(
-                            test_avg_episode_reward, test_std_episode_reward
-                        )
-                        is_terminated = True
 
                 episode_reward += reward
                 observation = new_observation
@@ -313,6 +294,29 @@ class DQN(nn.Module):
                         "Total Elapsed Time {}".format(total_training_time)
                     )
 
+                    if self.training_steps > 0 and n_episode % self.test_episode_interval == 0:
+                        test_episode_reward_avg, test_episode_reward_std = self.q_testing(
+                            self.test_num_episodes
+                        )
+
+                        print("[Test Episode Reward] Average: {0:.3f}, Standard Dev.: {1:.3f}".format(
+                            test_episode_reward_avg, test_episode_reward_std
+                        ))
+
+                        termination_conditions = [
+                            test_episode_reward_avg > self.episode_reward_avg_solved,
+                            test_episode_reward_std < self.episode_reward_std_solved
+                        ]
+
+                        if all(termination_conditions):
+                            print("Solved in {0} steps ({1} training steps)!".format(
+                                self.total_step_idx, self.training_steps
+                            ))
+                            self.model_save(
+                                test_episode_reward_avg, test_episode_reward_std
+                            )
+                            is_terminated = True
+
                     if WANDB:
                         wandb.log({
                             "Episode": n_episode,
@@ -322,8 +326,8 @@ class DQN(nn.Module):
                             "Epsilon": epsilon,
                             "Num Training Steps": self.training_steps,
                             "Loss": loss.item() if loss != 0.0 else 0.0,
-                            "Test Average Episode Reward": test_avg_episode_reward,
-                            "Test Std. Episode Reward": test_std_episode_reward
+                            "Test Average Episode Reward": test_episode_reward_avg,
+                            "Test Std. Episode Reward": test_episode_reward_std
                         })
                     break
 
@@ -378,12 +382,12 @@ class DQN(nn.Module):
 
         return loss
 
-    def model_save(self, test_avg_episode_reward, test_std_episode_reward):
+    def model_save(self, test_episode_reward_avg, test_episode_reward_std):
         print("Solved in {} frames!".format(self.total_step_idx))
         torch.save(
             self.q.state_dict(),
             os.path.join(MODEL_DIR, "dqn_{0}_{1:4.1f}_{2:3.1f}.pth".format(
-                ENV_NAME, test_avg_episode_reward, test_std_episode_reward
+                ENV_NAME, test_episode_reward_avg, test_episode_reward_std
             ))
         )
 
@@ -425,7 +429,7 @@ def main():
         epsilon_start=None,                     # Epsilon 초기 값
         epsilon_end=None,                       # Epsilon 최종 값
         epsilon_scheduled_last_episode=None,    # Epsilon 최종 값으로 스케줄되어지는 마지막 에피소드
-        test_training_step_interval=None,       # 테스트를 위한 training_step 간격
+        test_episode_interval=None,             # 테스트를 위한 training_step 간격
         test_num_episodes=None,                 # 테스트시에 수행하는 에피소드 횟수
         episode_reward_avg_solved=None,         # 훈련 종료를 위한 테스트 에피소드 리워드의 Average
         episode_reward_std_solved=None          # 훈련 종료를 위한 테스트 에피소드 리워드의 Standard Deviation
