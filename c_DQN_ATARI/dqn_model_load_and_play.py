@@ -85,7 +85,7 @@ def play(env, q, num_episodes):
         ))
 
 
-def main_q_play():
+def main_q_play(num_episodes):
     env = gym.make(ENV_NAME)
     env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=True)
     env = gym.wrappers.FrameStack(env, num_stack=4, lz4_compress=True)
@@ -96,8 +96,9 @@ def main_q_play():
         os.path.join(MODEL_DIR, "dqn_PongNoFrameskip-v4_ 4.0_0.0.pth")
     )
     q.load_state_dict(model_params)
-    play(env, q, num_episodes=3)
+    play(env, q, num_episodes=num_episodes)
 
 
 if __name__ == "__main__":
-    main_q_play()
+    NUM_EPISODES = 10
+    main_q_play(num_episodes=NUM_EPISODES)
