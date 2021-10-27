@@ -1,7 +1,15 @@
 # https://www.deeplearningwizard.com/deep_learning/deep_reinforcement_learning_pytorch/dynamic_programming_frozenlake/
 # -*- coding: utf-8 -*-
+import collections
+import time
+from collections import namedtuple
+import random
 import sys
 import os
+from typing import Tuple
+
+from torch import nn
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 import gym
@@ -24,217 +32,375 @@ PROJECT_HOME = os.path.abspath(os.path.join(CURRENT_PATH, os.pardir))
 if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
 
-from b_DQN.dqn import Qnet, ReplayMemory
-
-
 MODEL_DIR = os.path.join(PROJECT_HOME, "b_DQN", "models")
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
 
-WANDB = False
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-if WANDB:
-    wandb = wandb.init(
-        entity="link-koreatech",
-        project="DQN"
-    )
+Transition = namedtuple(
+    typename='Experience',
+    field_names=['state', 'action', 'reward', 'new_state', 'done']
+)
 
 
-def q_learning(
-        env, test_env, num_episodes=1000, learning_rate=0.0001, gamma=0.99,
-        epsilon_start=0.2, epsilon_end=0.01, batch_size=32,
-        train_step_interval=4, target_update_step_interval=100,
-        print_episode_interval=10, test_num_episodes=3,
-        episode_reward_solved=475, episode_reward_std_solved=25
-):
-    q = Qnet()
-    q_target = Qnet()
-    q_target.load_state_dict(q.state_dict())
-    memory = ReplayMemory()
+class Qnet(nn.Module):
+    def __init__(self):
+        super(Qnet, self).__init__()
+        self.fc1 = nn.Linear(4, 128)  # fully connected
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, 2)
 
-    optimizer = optim.Adam(q.parameters(), lr=learning_rate)
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
 
-    training_step_lst = []
-    episode_reward_lst = []
+    def get_action(self, obs, epsilon):
+        out = self.forward(obs)
 
-    training_steps = 0
-    last_episode_reward = 0
+        coin = random.random() # 0.0과 1.0사이의 임의의 값을 반환
+        if coin < epsilon:
+            return random.randint(0, 1)
+        else:
+            return out.argmax().item()  # argmax: 더 큰 값에 대응되는 인덱스 반환
 
-    total_step_idx = 0
 
-    test_training_step_lst = []
-    test_avg_episode_reward_lst = []
+class ReplayBuffer:
+    def __init__(self, capacity):
+        self.buffer = collections.deque(maxlen=capacity)
 
-    test_avg_episode_reward = None
-    test_std_episode_reward = None
-    is_terminated = False
+    def __len__(self):
+        return len(self.buffer)
 
-    for i in range(num_episodes):
-        epsilon = max(epsilon_end, epsilon_start - 0.5 * (i / num_episodes))
+    def size(self):
+        return len(self.buffer)
 
-        episode_reward = 0  # cumulative_reward
+    def append(self, transition: Transition) -> None:
+        self.buffer.append(transition)
 
-        # Environment 초기화와 변수 초기화
-        observation = env.reset()
-        #env.render()
+    def pop(self):
+        return self.buffer.pop()
 
-        while True:
-            total_step_idx += 1
+    def reset(self):
+        self.buffer.clear()
 
-            # 가장 Q값이 높은 action을 결정함
-            action = q.get_action(torch.from_numpy(observation).float(), epsilon)
+    def sample(self, batch_size: int) -> Tuple:
+        # Get index
+        indices = np.random.choice(len(self.buffer), size=batch_size, replace=False)
 
-            # action을 통해서 next_state, reward, done, info를 받아온다
-            next_observation, reward, done, _ = env.step(action)
-            #env.render()
-            done_mask = 0.0 if done else 1.0
+        # Sample
+        states, actions, rewards, next_states, dones = zip(*[self.buffer[idx] for idx in indices])
 
-            memory.put(
-                transition=(observation, action, reward / 100.0, next_observation, done_mask)
+        # Convert to ndarray for speed up cuda
+        states = np.array(states)
+        actions = np.array(actions)
+        rewards = np.array(rewards, dtype=np.float32)
+        next_states = np.array(next_states)
+        dones = np.array(dones, dtype=bool)
+
+        # Convert to tensor
+        states = torch.tensor(states, dtype=torch.float32, device=DEVICE)
+        actions = torch.tensor(actions, dtype=torch.int64, device=DEVICE)
+        rewards = torch.tensor(rewards, dtype=torch.float32, device=DEVICE)
+        next_states = torch.tensor(next_states, dtype=torch.float32, device=DEVICE)
+        dones = torch.tensor(dones, dtype=torch.bool, device=DEVICE)
+
+        return states, actions, rewards, next_states, dones
+
+
+class DQN():
+    def __init__(
+            self, use_wandb, wandb_entity,
+            max_num_episodes, batch_size, learning_rate,
+            gamma, target_sync_step_interval,
+            replay_buffer_size, min_buffer_size_for_training,
+            epsilon_start, epsilon_end,
+            epsilon_scheduled_last_episode,
+            print_episode_interval,
+            test_episode_interval, test_num_episodes,
+            episode_reward_avg_solved, episode_reward_std_solved
+    ):
+        self.use_wandb = use_wandb
+        if self.use_wandb:
+            self.wandb = wandb.init(
+                entity=wandb_entity,
+                project="DQN_CARTPOLE"
             )
+        self.max_num_episodes = max_num_episodes
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+        self.gamma = gamma
+        self.target_sync_step_interval = target_sync_step_interval
+        self.replay_buffer_size = replay_buffer_size
+        self.min_buffer_size_for_training = min_buffer_size_for_training
+        self.epsilon_start = epsilon_start
+        self.epsilon_end = epsilon_end
+        self.epsilon_scheduled_last_episode = epsilon_scheduled_last_episode
+        self.print_episode_interval = print_episode_interval
+        self.test_episode_interval = test_episode_interval
+        self.test_num_episodes = test_num_episodes
+        self.episode_reward_avg_solved = episode_reward_avg_solved
+        self.episode_reward_std_solved = episode_reward_std_solved
 
-            if memory.size() > 2000 and total_step_idx % train_step_interval == 0:
-                observation_t, action_t, reward_t, next_observation_t, done_mask_t = memory.sample(batch_size)
+        # env
+        self.env = gym.make(ENV_NAME)
 
-                q_out = q(observation_t)                                   # q_out.shape: (32, 2)
-                q_a = q_out.gather(dim=1, index=action_t)                  # q_a.shape: (32, 2)
+        # test_env
+        self.test_env = gym.make(ENV_NAME)
 
-                q_prime_out = q_target(next_observation_t)                 # q_prime_out.shape: (32, 2)
+        # network
+        self.q = Qnet().to(DEVICE)
+        self.target_q = Qnet().to(DEVICE)
+        self.optimizer = optim.Adam(self.q.parameters(), lr=self.learning_rate)
 
-                # q_prime_out.max(dim=1).values.shape: (32,)
-                max_q_prime = q_prime_out.max(dim=1).values.unsqueeze(dim=-1)  # max_q_prime.shape: (32, 1)
+        # agent
+        self.replay_buffer = ReplayBuffer(self.replay_buffer_size)
 
-                target = reward_t + gamma * max_q_prime * done_mask_t
-                loss = F.mse_loss(target, q_a)
+        # init rewards
+        self.total_rewards = []
+        self.best_mean_reward = -1000000000
 
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+        self.total_step_idx = 0
+        self.training_steps = 0
 
-                training_steps += 1    # Q 업데이트 횟수 증가
-                training_step_lst.append(training_steps)
-                episode_reward_lst.append(last_episode_reward)
+    def get_action(self, observation, epsilon):
+        if random.random() < epsilon:
+            action = random.randint(0, 1)
+        else:
+            # Convert to Tensor
+            observation = torch.tensor(observation, dtype=torch.float32, device=DEVICE)
 
-                if WANDB:
-                    wandb.log({
-                        "EPISODE": i,
-                        "EPISODE_REWARD": episode_reward,
-                        "LOSS": loss.item(),
-                        "SIZE_OF_REPLAY_BUFFER": memory.size(),
-                        "EPSILON": epsilon,
-                        "TRAINING_STEPS": training_steps,
-                        "TEST_AVG_EPISODE_REWARD": test_avg_episode_reward,
-                        "TEST_STD_EPISODE_REWARD": test_std_episode_reward
-                    })
+            # Add batch-dim
+            if len(observation.shape) == 3:
+                observation = observation.unsqueeze(dim=0)
 
-            if total_step_idx % target_update_step_interval == 0:
-                q_target.load_state_dict(q.state_dict())
+            q_values = self.q(observation)
+            action = torch.argmax(q_values, dim=-1)
+            action = int(action.item())
 
-            if training_steps != 0 and training_steps % 10 == 0:
-                test_avg_episode_reward, test_std_episode_reward = q_testing(
-                    test_env, q, test_num_episodes
+        return action
+
+    def epsilon_scheduled(self, current_episode):
+        fraction = min(current_episode / self.epsilon_scheduled_last_episode, 1.0)
+        epsilon = min(
+            self.epsilon_start + fraction * (self.epsilon_end - self.epsilon_start),
+            self.epsilon_start
+        )
+        return epsilon
+
+    def train_loop(self):
+        loss = 0.0
+
+        total_train_start_time = time.time()
+
+        test_episode_reward_avg = 0.0
+        test_episode_reward_std = 0.0
+
+        is_terminated = False
+
+        for n_episode in range(self.max_num_episodes):
+            epsilon = self.epsilon_scheduled(n_episode)
+
+            episode_reward = 0
+
+            # Environment 초기화와 변수 초기화
+            observation = self.env.reset()
+
+            while True:
+                self.total_step_idx += 1
+
+                action = self.get_action(observation, epsilon)
+
+                # do step in the environment
+                next_observation, reward, done, _ = self.env.step(action)
+
+                transition = Transition(
+                    observation, action, reward, next_observation, done
                 )
-                test_training_step_lst.append(training_steps)
-                test_avg_episode_reward_lst.append(test_avg_episode_reward)
+                self.replay_buffer.append(transition)
 
-                termination_conditions = [
-                    test_avg_episode_reward > episode_reward_solved,
-                    test_std_episode_reward < episode_reward_std_solved
-                ]
+                if self.total_step_idx > self.min_buffer_size_for_training:
+                    loss = self.train_step()
 
-                if all(termination_conditions):
-                    torch.save(
-                        q.state_dict(),
-                        os.path.join(MODEL_DIR, "dqn_{0}_{1:4.1f}_{2:3.1f}.pth".format(
-                            ENV_NAME, test_avg_episode_reward, test_std_episode_reward
-                        ))
+                episode_reward += reward
+                observation = next_observation
+
+                if done:
+                    self.total_rewards.append(episode_reward)
+
+                    mean_episode_reward = np.mean(self.total_rewards[-100:])
+
+                    total_training_time = time.time() - total_train_start_time
+                    total_training_time = time.strftime(
+                        '%H:%M:%S', time.gmtime(total_training_time)
                     )
-                    is_terminated = True
 
-            # episode_reward 를 산출하는 방법은 감가률 고려하지 않는 이 라인이 더 올바름.
-            episode_reward += reward
-            observation = next_observation
+                    if n_episode % self.print_episode_interval == 0:
+                        print(
+                            "[Episode {:3}, Steps {:6}]".format(
+                                n_episode, self.total_step_idx
+                            ),
+                            "Episode Reward: {:>5},".format(episode_reward),
+                            "Mean Episode Reward: {:.3f},".format(mean_episode_reward),
+                            "size of replay buffer: {:>6}".format(
+                                self.replay_buffer.size()
+                            ),
+                            "Loss: {:.3f},".format(loss),
+                            "Epsilon: {:.2f},".format(epsilon),
+                            "Num Training Steps: {:4},".format(self.training_steps),
+                            "Total Elapsed Time {}".format(total_training_time)
+                        )
 
-            if done or is_terminated:
-                last_episode_reward = episode_reward
+                    if self.training_steps > 0 and n_episode % self.test_episode_interval == 0:
+                        test_episode_reward_avg, test_episode_reward_std = self.q_testing(
+                            self.test_num_episodes
+                        )
+
+                        print("[Test Episode Reward] Average: {0:.3f}, Standard Dev.: {1:.3f}".format(
+                            test_episode_reward_avg, test_episode_reward_std
+                        ))
+
+                        termination_conditions = [
+                            test_episode_reward_avg > self.episode_reward_avg_solved,
+                            test_episode_reward_std < self.episode_reward_std_solved
+                        ]
+
+                        if all(termination_conditions):
+                            print("Solved in {0} steps ({1} training steps)!".format(
+                                self.total_step_idx, self.training_steps
+                            ))
+                            self.model_save(
+                                test_episode_reward_avg, test_episode_reward_std
+                            )
+                            is_terminated = True
+
+                    if self.use_wandb:
+                        self.wandb.log({
+                            "Episode": n_episode,
+                            "Episode Reward": episode_reward,
+                            "Mean Episode Reward": mean_episode_reward,
+                            "Size of replay buffer": self.replay_buffer.size(),
+                            "Epsilon": epsilon,
+                            "Num Training Steps": self.training_steps,
+                            "Loss": loss if loss != 0.0 else 0.0,
+                            "[TEST] Average Episode Reward": test_episode_reward_avg,
+                            "[TEST] Std. Episode Reward": test_episode_reward_std
+                        })
+
+                    break
+
+            if is_terminated:
                 break
 
-        if i % print_episode_interval == 0 and i != 0:
-            print("EPISODE: {0:3d}, EPISODE_REWARD: {1:5.1f}, "
-                  "SIZE_OF_REPLAY_BUFFER: {2:5d}, EPSILON: {3:.3f}, "
-                  "TRAINING_STEPS: {4:5d}".format(
-                i, episode_reward, memory.size(), epsilon, training_steps
+        total_training_time = time.time() - total_train_start_time
+        total_training_time = time.strftime('%H:%M:%S', time.gmtime(total_training_time))
+        print("Total Training End : {}".format(total_training_time))
+
+    def train_step(self):
+        self.training_steps += 1
+
+        batch = self.replay_buffer.sample(self.batch_size)
+
+        # states.shape: torch.Size([32, 4, 84, 84]), actions.shape: torch.Size([32]),
+        # rewards.shape: torch.Size([32]), next_states.shape: torch.Size([32, 4, 84, 84]),
+        # dones.shape: torch.Size([32])
+        states, actions, rewards, next_states, dones = batch
+
+        # state_action_values.shape: torch.Size([32])
+        state_action_values = self.q(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
+
+        with torch.no_grad():
+            # next_state_values.shape: torch.Size([32])
+            next_state_values = self.target_q(next_states).max(dim=1).values
+            next_state_values[dones] = 0.0
+            next_state_values = next_state_values.detach()
+
+            # target_state_action_values.shape: torch.Size([32])
+            target_state_action_values = rewards + self.gamma * next_state_values
+
+        loss = F.mse_loss(state_action_values, target_state_action_values)
+
+        # print("states.shape: {0}, actions.shape: {1}, rewards.shape: {2}, "
+        #       "next_states.shape: {3}, dones.shape: {4}".format(
+        #     states.shape, actions.shape, rewards.shape, next_states.shape, dones.shape
+        # ))
+        # print("state_action_values.shape: {0}".format(state_action_values.shape))
+        # print("next_state_values.shape: {0}".format(next_state_values.shape))
+        # print("target_state_action_values.shape: {0}".format(
+        #     target_state_action_values.shape
+        # ))
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        # sync
+        if self.total_step_idx % self.target_sync_step_interval == 0:
+            self.target_q.load_state_dict(self.q.state_dict())
+
+        return loss.item()
+
+    def model_save(self, test_episode_reward_avg, test_episode_reward_std):
+        print("Solved in {0} steps ({1} training steps)!".format(
+            self.total_step_idx, self.training_steps
+        ))
+        torch.save(
+            self.q.state_dict(),
+            os.path.join(MODEL_DIR, "dqn_{0}_{1:4.1f}_{2:3.1f}.pth".format(
+                ENV_NAME, test_episode_reward_avg, test_episode_reward_std
             ))
+        )
 
-        if is_terminated:
-            break
+    def q_testing(self, num_episodes):
+        episode_reward_lst = []
 
-    return training_step_lst, episode_reward_lst, test_training_step_lst, \
-           test_avg_episode_reward_lst
+        for i in range(num_episodes):
+            episode_reward = 0  # cumulative_reward
 
+            # Environment 초기화와 변수 초기화
+            observation = self.test_env.reset()
 
-def q_testing(test_env, q, num_episodes):
-    episode_reward_lst = []
+            while True:
+                action = self.get_action(observation, epsilon=0.0)
 
-    for i in range(num_episodes):
-        episode_reward = 0  # cumulative_reward
+                # action을 통해서 next_state, reward, done, info를 받아온다
+                next_observation, reward, done, _ = self.test_env.step(action)
 
-        # Environment 초기화와 변수 초기화
-        observation = test_env.reset()
+                episode_reward += reward  # episode_reward 를 산출하는 방법은 감가률 고려하지 않는 이 라인이 더 올바름.
+                observation = next_observation
 
-        while True:
-            action = q.get_action(torch.from_numpy(observation).float(), epsilon=0.0)
+                if done:
+                    break
 
-            # action을 통해서 next_state, reward, done, info를 받아온다
-            next_observation, reward, done, _ = test_env.step(action)
+            episode_reward_lst.append(episode_reward)
 
-            episode_reward += reward  # episode_reward 를 산출하는 방법은 감가률 고려하지 않는 이 라인이 더 올바름.
-            observation = next_observation
-
-            if done:
-                break
-
-        episode_reward_lst.append(episode_reward)
-
-    return np.average(episode_reward_lst), np.std(episode_reward_lst)
+        return np.average(episode_reward_lst), np.std(episode_reward_lst)
 
 
-def main_q_learning():
-    NUM_EPISODES = 300
-    LEARNING_RATE = 0.0001
-    GAMMA = 0.99
-    EPSILON_START = 0.7
-    EPSILON_END = 0.01
-    BATCH_SIZE = 32
-    TRAIN_STEP_INTERVAL = 4
-    TARGET_UPDATE_STEP_INTERVAL = 100
-    PRINT_EPISODE_INTERVAL = 10
-    TEST_NUM_EPISODES = 7
-    EPISODE_REWARD_SOLVED = 475
-    EPISODE_REWARD_STD_SOLVED = 25
-
-    env = gym.make(ENV_NAME)
-    test_env = gym.make(ENV_NAME)
-
-    training_step_lst, episode_reward_lst, \
-    test_training_step_lst, test_avg_episode_reward_lst = q_learning(
-        env, test_env,
-        NUM_EPISODES, LEARNING_RATE, GAMMA,
-        EPSILON_START, EPSILON_END, BATCH_SIZE, TRAIN_STEP_INTERVAL,
-        TARGET_UPDATE_STEP_INTERVAL, PRINT_EPISODE_INTERVAL, TEST_NUM_EPISODES,
-        EPISODE_REWARD_SOLVED, EPISODE_REWARD_STD_SOLVED
+def main():
+    dqn = DQN(
+        use_wandb=False,                            # WANDB 연결 및 로깅 유무
+        wandb_entity="link-koreatech",          # WANDB 개인 계정
+        max_num_episodes=1000,                  # 훈련을 위한 최대 에피소드 횟수
+        batch_size=32,                          # 훈련시 배치에서 한번에 가져오는 랜덤 배치 사이즈
+        learning_rate=0.0001,                   # 학습율
+        gamma=0.99,                             # 감가율
+        target_sync_step_interval=500,          # 기존 Q 모델을 타깃 Q 모델로 동기화시키는 step 간격
+        replay_buffer_size=5_000,               # 리플레이 버퍼 사이즈
+        min_buffer_size_for_training=100,       # 훈련을 위한 최소 리플레이 버퍼 사이즈
+        epsilon_start=0.5,                      # Epsilon 초기 값
+        epsilon_end=0.01,                       # Epsilon 최종 값
+        epsilon_scheduled_last_episode=300,     # Epsilon 최종 값으로 스케줄되어지는 마지막 에피소드
+        print_episode_interval=10,              # Episode 통계 출력에 관한 에피소드 간격
+        test_episode_interval=50,               # 테스트를 위한 episode 간격
+        test_num_episodes=3,                    # 테스트시에 수행하는 에피소드 횟수
+        episode_reward_avg_solved=450,          # 훈련 종료를 위한 테스트 에피소드 리워드의 Average
+        episode_reward_std_solved=10            # 훈련 종료를 위한 테스트 에피소드 리워드의 Standard Deviation
     )
-
-    plt.plot(training_step_lst, episode_reward_lst, color="Blue")
-    plt.xlabel("training steps")
-    plt.ylabel("episode reward")
-    plt.show()
-
-    plt.plot(test_training_step_lst, test_avg_episode_reward_lst, color="Red")
-    plt.xlabel("training steps")
-    plt.ylabel("test episode reward")
-    plt.show()
+    dqn.train_loop()
 
 
-if __name__ == "__main__":
-    main_q_learning()
+if __name__ == '__main__':
+    main()
