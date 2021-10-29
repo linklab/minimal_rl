@@ -16,6 +16,8 @@ Implementations of basic RL algorithms with minimal lines of codes! (PyTorch bas
   - conda install -c conda-forge gym-all
 3. lz4
   - pip install lz4
+4. nvidia-ml-py3
+  - pip install nvidia-ml-py3
 
 ## Git을 통한 초기화 방법 Permalink
 1. 기존의 히스토리 삭제

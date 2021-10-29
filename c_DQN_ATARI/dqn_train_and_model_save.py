@@ -21,7 +21,6 @@ if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-os.environ['CUDA_LAUNCH_BLOCKING'] = 'True'
 os.environ['CUDA_VISIBLE_DEVICES'] = 'True'
 
 # local
@@ -118,7 +117,7 @@ class AtariCNN(nn.Module):
 
 class DQN(nn.Module):
     def __init__(
-            self, use_wandb, wandb_entity,
+            self, env_name, use_wandb, wandb_entity, env, test_env,
             max_num_episodes, batch_size, learning_rate,
             gamma, target_sync_step_interval,
             replay_buffer_size, min_buffer_size_for_training,
@@ -128,12 +127,15 @@ class DQN(nn.Module):
             episode_reward_avg_solved, episode_reward_std_solved
     ):
         super().__init__()
+        self.env_name = env_name
+
         self.use_wandb = use_wandb
         if self.use_wandb:
             self.wandb = wandb.init(
                 entity=wandb_entity,
-                project="DQN_PONG"
+                project="DQN_{0}".format(self.env_name)
             )
+
         self.max_num_episodes = max_num_episodes
         self.batch_size = batch_size
         self.learning_rate = learning_rate
@@ -149,23 +151,8 @@ class DQN(nn.Module):
         self.episode_reward_avg_solved = episode_reward_avg_solved
         self.episode_reward_std_solved = episode_reward_std_solved
 
-        # env
-        self.env = gym.make(ENV_NAME)
-        self.env = gym.wrappers.AtariPreprocessing(
-            self.env, grayscale_obs=True, scale_obs=True
-        )
-        self.env = gym.wrappers.FrameStack(
-            self.env, num_stack=4, lz4_compress=True
-        )
-
-        # test_env
-        self.test_env = gym.make(ENV_NAME)
-        self.test_env = gym.wrappers.AtariPreprocessing(
-            self.test_env, grayscale_obs=True, scale_obs=True
-        )
-        self.test_env = gym.wrappers.FrameStack(self.test_env, num_stack=4, lz4_compress=True)
-
-        # self.env = make_env(self.env_name)
+        self.env = env
+        self.test_env = test_env
 
         obs_shape = self.env.observation_space.shape
         #n_actions = self.env.action_space.n
@@ -419,9 +406,25 @@ class DQN(nn.Module):
 
 
 def main():
+    ENV_NAME = "PongNoFrameskip-v4"
+
+    # env
+    env = gym.make(ENV_NAME)
+    env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=True)
+    env = gym.wrappers.FrameStack(env, num_stack=4, lz4_compress=True)
+
+    # test_env
+    test_env = gym.make(ENV_NAME)
+    test_env = gym.wrappers.AtariPreprocessing(test_env, grayscale_obs=True, scale_obs=True
+    )
+    test_env = gym.wrappers.FrameStack(test_env, num_stack=4, lz4_compress=True)
+
     dqn = DQN(
-        use_wandb=False,                            # WANDB 연결 및 로깅 유무
-        wandb_entity="",                        # WANDB 개인 계정
+        env_name=ENV_NAME,
+        use_wandb=True,                         # WANDB 연결 및 로깅 유무
+        wandb_entity="link-koreatech",          # WANDB 개인 계정
+        env=env,
+        test_env=test_env,
         max_num_episodes=None,                  # 훈련을 위한 최대 에피소드 횟수
         batch_size=None,                        # 훈련시 배치에서 한번에 가져오는 랜덤 배치 사이즈
         learning_rate=None,                     # 학습율
