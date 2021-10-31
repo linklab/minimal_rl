@@ -82,11 +82,16 @@ class REINFORCE:
         self.total_step_idx = 0
         self.training_steps = 0
 
-    def get_action(self, observation):
+    def get_action(self, observation, mode="train"):
         action_prob = self.pi(torch.from_numpy(observation).float())
-        m = Categorical(action_prob)
-        action = m.sample()
-        return action_prob, action.item()
+        m = Categorical(probs=action_prob)
+
+        if mode == "train":
+            action = m.sample()
+        else:
+            action = torch.argmax(m.probs)
+
+        return action_prob[action], action.item()
 
     def train_loop(self):
         total_train_start_time = time.time()
@@ -111,7 +116,7 @@ class REINFORCE:
 
                 next_observation, reward, done, _ = self.env.step(action)
 
-                self.buffer.append((reward, action_prob[action]))
+                self.buffer.append((reward, action_prob))
                 observation = next_observation
                 episode_reward += reward
 
@@ -223,7 +228,7 @@ class REINFORCE:
             observation = self.test_env.reset()
 
             while True:
-                _, action = self.get_action(observation)
+                _, action = self.get_action(observation, mode="test")
 
                 next_observation, reward, done, _ = self.test_env.step(action)
 
