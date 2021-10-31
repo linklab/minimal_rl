@@ -21,7 +21,6 @@ if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-os.environ['CUDA_VISIBLE_DEVICES'] = 'True'
 
 # local
 ENV_NAME = "PongNoFrameskip-v4"
