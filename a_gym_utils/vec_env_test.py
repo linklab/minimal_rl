@@ -42,6 +42,9 @@ class SleepyToyEnv(gym.Env):
             reward = 0.0
             return self.current_state, reward, False, {}
 
+    def render(self, mode="human"):
+        pass
+
     def close(self):
         pass
 

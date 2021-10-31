@@ -33,6 +33,9 @@ class ToyEnv(gym.Env):
             reward = 0.0
             return self.current_state, reward, False, {}
 
+    def render(self, mode="human"):
+        pass
+    
     def close(self):
         pass
 
@@ -76,6 +79,7 @@ class CustomActionWrapper(gym.ActionWrapper):
             action = action
 
         return action
+
 
 def main():
     env = CustomActionWrapper(CustomRewardWrapper(CustomObservationWrapper(
