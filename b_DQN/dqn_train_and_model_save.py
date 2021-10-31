@@ -278,15 +278,15 @@ class DQN():
 
                     if self.use_wandb:
                         self.wandb.log({
-                            "Episode": n_episode,
-                            "Episode Reward": episode_reward,
-                            "Mean Episode Reward": mean_episode_reward,
-                            "Size of replay buffer": self.replay_buffer.size(),
-                            "Epsilon": epsilon,
-                            "Num Training Steps": self.training_steps,
-                            "Loss": loss if loss != 0.0 else 0.0,
                             "[TEST] Average Episode Reward": test_episode_reward_avg,
-                            "[TEST] Std. Episode Reward": test_episode_reward_std
+                            "[TEST] Std. Episode Reward": test_episode_reward_std,
+                            "Episode Reward": episode_reward,
+                            "Loss": loss if loss != 0.0 else 0.0,
+                            "Epsilon": epsilon,
+                            "Mean Episode Reward": mean_episode_reward,
+                            "Episode": n_episode,
+                            "Size of replay buffer": self.replay_buffer.size(),
+                            "Number of Training Steps": self.training_steps
                         })
 
                     break

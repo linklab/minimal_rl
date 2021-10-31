@@ -21,8 +21,6 @@ if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-os.environ['CUDA_LAUNCH_BLOCKING'] = 'True'
-os.environ['CUDA_VISIBLE_DEVICES'] = 'True'
 
 # local
 ENV_NAME = "PongNoFrameskip-v4"
@@ -321,15 +319,15 @@ class DQN:
 
                     if self.use_wandb:
                         self.wandb.log({
-                            "Episode": n_episode,
-                            "Episode Reward": episode_reward,
-                            "Mean Episode Reward": mean_episode_reward,
-                            "Size of replay buffer": self.replay_buffer.size(),
-                            "Epsilon": epsilon,
-                            "Num Training Steps": self.training_steps,
-                            "Loss": loss if loss != 0.0 else 0.0,
                             "[TEST] Average Episode Reward": test_episode_reward_avg,
-                            "[TEST] Std. Episode Reward": test_episode_reward_std
+                            "[TEST] Std. Episode Reward": test_episode_reward_std,
+                            "Episode Reward": episode_reward,
+                            "Loss": loss if loss != 0.0 else 0.0,
+                            "Epsilon": epsilon,
+                            "Mean Episode Reward": mean_episode_reward,
+                            "Episode": n_episode,
+                            "Size of replay buffer": self.replay_buffer.size(),
+                            "Number of Training Steps": self.training_steps,
                         })
 
                     break
@@ -391,7 +389,7 @@ class DQN:
         ))
         torch.save(
             self.q.state_dict(),
-            os.path.join(MODEL_DIR, "dqn_{0}_{1:.1f}_{2:.1f}.pth".format(
+            os.path.join(MODEL_DIR, "dqn_{0}_{1:4.1f}_{2:3.1f}.pth".format(
                 ENV_NAME, test_episode_reward_avg, test_episode_reward_std
             ))
         )

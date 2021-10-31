@@ -5,7 +5,6 @@ import sys
 import time
 
 import gym
-import numpy as np
 import torch
 import os
 

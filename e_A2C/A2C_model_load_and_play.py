@@ -17,6 +17,8 @@ if PROJECT_HOME not in sys.path:
 
 from d_REINFORCE.REINFORCE_train_and_model_save import Policy
 
+ENV_NAME = "CartPole-v1"
+
 MODEL_DIR = os.path.join(PROJECT_HOME, "d_REINFORCE", "models")
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -60,8 +62,6 @@ def play(env, pi, num_episodes):
 
 
 def main_reinforce_play(num_episodes):
-    ENV_NAME = "CartPole-v1"
-
     env = gym.make(ENV_NAME)
 
     pi = Policy()

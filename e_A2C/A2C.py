@@ -51,9 +51,6 @@ def worker(worker_id, master_end, worker_end):
         elif cmd == 'reset':
             ob = env.reset()
             worker_end.send(ob)
-        elif cmd == 'reset_task':
-            ob = env.reset_task()
-            worker_end.send(ob)
         elif cmd == 'close':
             worker_end.close()
             break
@@ -68,21 +65,25 @@ class ParallelEnv:
         self.nenvs = n_train_processes
         self.waiting = False
         self.closed = False
-        self.workers = list()
+        self.worker_lst = list()
 
-        master_ends, worker_ends = zip(*[mp.Pipe() for _ in range(self.nenvs)])
-        self.master_ends, self.worker_ends = master_ends, worker_ends
+        self.master_ends = list()
 
-        for worker_id, (master_end, worker_end) in enumerate(zip(master_ends, worker_ends)):
-            p = mp.Process(target=worker,
-                           args=(worker_id, master_end, worker_end))
+        pipe_lst = [mp.Pipe() for _ in range(self.nenvs)]
+
+        for worker_id, (master_end, worker_end) in enumerate(pipe_lst):
+            p = mp.Process(
+                target=worker,
+                args=(worker_id, master_end, worker_end)
+            )
             p.daemon = True
             p.start()
-            self.workers.append(p)
+            self.worker_lst.append(p)
 
         # Forbid master to use the worker end for messaging
-        for worker_end in worker_ends:
+        for master_end, worker_end in pipe_lst:
             worker_end.close()
+            self.master_ends.append(master_end)
 
     def step_async(self, actions):
         for master_end, action in zip(self.master_ends, actions):
@@ -111,12 +112,12 @@ class ParallelEnv:
             [master_end.recv() for master_end in self.master_ends]
         for master_end in self.master_ends:
             master_end.send(('close', None))
-        for worker in self.workers:
+        for worker in self.worker_lst:
             worker.join()
             self.closed = True
 
 
-def test(step_idx, model):
+def a2c_test(step_idx, model):
     env = gym.make('CartPole-v1')
     score = 0.0
     done = False
@@ -181,14 +182,14 @@ if __name__ == '__main__':
 
         pi = model.pi(s_vec, softmax_dim=1)
         pi_a = pi.gather(1, a_vec).reshape(-1)
-        loss = -(torch.log(pi_a) * advantage.detach()).mean() +\
-            F.smooth_l1_loss(model.v(s_vec).reshape(-1), td_target_vec)
+        loss = -(torch.log(pi_a) * advantage.detach()).mean() + \
+               F.smooth_l1_loss(model.v(s_vec).reshape(-1), td_target_vec)
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         if step_idx % PRINT_INTERVAL == 0:
-            test(step_idx, model)
+            a2c_test(step_idx, model)
 
     envs.close()
