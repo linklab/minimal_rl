@@ -148,7 +148,7 @@ b_DQN/models/
 b_DQN/wandb/
 c_DQN_ATARI/wandb/
 
-/wandb/
+*/wandb/
 
 ### Example user template template
 ### Example user template

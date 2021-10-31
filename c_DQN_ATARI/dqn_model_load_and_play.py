@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 import random
 import sys
+import time
+
 import gym
 import numpy as np
 import torch
@@ -77,6 +79,7 @@ def play(env, q, num_episodes):
             episode_reward += reward  # episode_reward 를 산출하는 방법은 감가률 고려하지 않는 이 라인이 더 올바름.
             observation = next_observation
 
+            time.sleep(0.05)
             if done:
                 break
 
@@ -85,19 +88,23 @@ def play(env, q, num_episodes):
         ))
 
 
-def main_q_play():
+def main_q_play(num_episodes):
     env = gym.make(ENV_NAME)
     env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=True)
     env = gym.wrappers.FrameStack(env, num_stack=4, lz4_compress=True)
+
     obs_shape = env.observation_space.shape
     n_actions = 3
     q = AtariCNN(obs_shape, n_actions).to(DEVICE)
     model_params = torch.load(
-        os.path.join(MODEL_DIR, "dqn_PongNoFrameskip-v4_ 4.0_0.0.pth")
+        os.path.join(MODEL_DIR, "dqn_PongNoFrameskip-v4_6.0_1.4.pth")
     )
     q.load_state_dict(model_params)
-    play(env, q, num_episodes=3)
+    play(env, q, num_episodes=num_episodes)
+
+    env.close()
 
 
 if __name__ == "__main__":
-    main_q_play()
+    NUM_EPISODES = 5
+    main_q_play(num_episodes=NUM_EPISODES)
