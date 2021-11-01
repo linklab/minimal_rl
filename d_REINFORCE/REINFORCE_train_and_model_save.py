@@ -195,6 +195,27 @@ class REINFORCE:
         policy_gradient = torch.tensor(0.0, dtype=torch.float32)
 
         self.optimizer.zero_grad()
+
+        for r, prob in self.buffer[::-1]:
+            G = r + self.gamma * G
+            policy_gradient += torch.log(prob)
+
+        policy_gradient = torch.multiply(policy_gradient, -1.0 * G)
+
+        policy_gradient.backward()
+        self.optimizer.step()
+        self.buffer = []
+
+        return G
+
+    def train_step_2(self):
+        self.training_steps += 1
+
+        G = 0
+        policy_gradient = torch.tensor(0.0, dtype=torch.float32)
+
+        self.optimizer.zero_grad()
+
         for r, prob in self.buffer[::-1]:
             G = r + self.gamma * G
             policy_gradient += torch.log(prob) * G

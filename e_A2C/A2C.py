@@ -163,6 +163,7 @@ if __name__ == '__main__':
             a = Categorical(prob).sample().numpy()
             s_prime, r, done, info = envs.step(a)
 
+            print(s, a, r, s_prime, done)
             s_lst.append(s)
             a_lst.append(a)
             r_lst.append(r/100.0)

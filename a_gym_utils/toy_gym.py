@@ -24,8 +24,8 @@ class ToyEnv(gym.Env):
         assert self.action_space.contains(action), \
             "Action {0} is not valid".format(action)
 
-        self.current_state += 1
-        is_done = self.current_state == self.terminal_state
+        self.current_state += action
+        is_done = self.current_state >= self.terminal_state
         if is_done:
             reward = 10.0
             return self.terminal_state, reward, True, {}
@@ -91,8 +91,8 @@ def main():
         action = env.action_space.sample()
         next_observation, reward, done, info = env.step(action)
 
-        print("[{0}] Observation: {1}, Action: {2}, "
-              "Reward: {3}, Next Observation: {4}".format(
+        print("[{0:>3}] Observation: {1}, Action: {2}, "
+              "Reward: {3}, Next Observation: {4}, Done: {5}".format(
             t, observation, action, reward, next_observation, done
         ))
 

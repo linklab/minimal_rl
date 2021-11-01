@@ -1,8 +1,10 @@
 import random
 import time
-
+import numpy as np
 import gym
 from gym.vector import SyncVectorEnv, AsyncVectorEnv
+
+from b_DQN.dqn_train_and_model_save import ReplayBuffer, Transition
 
 
 class SleepyToyEnv(gym.Env):
@@ -16,25 +18,23 @@ class SleepyToyEnv(gym.Env):
         self.action_space = gym.spaces.Discrete(n=2)
         self.current_state = -1
         self.terminal_state = 4
-        self.max_sleep_time = 3
+        self.max_sleep_time = 2
 
     def reset(self):
         self.current_state = 0
-        print("RESET!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-
-        # 0 <= rand < self.max_sleep_time
-        time.sleep(random.randrange(0, self.max_sleep_time))
+        #print("RESET!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         return self.current_state
 
     def step(self, action):
         assert self.action_space.contains(action), \
             "Action {0} is not valid".format(action)
 
-        # 0 <= rand < self.max_sleep_time
-        time.sleep(random.randrange(0, self.max_sleep_time))
+        # 0 <= sleep_time < self.max_sleep_time
+        sleep_time = random.randrange(0, self.max_sleep_time)
+        time.sleep(sleep_time)
 
-        self.current_state += 1
-        is_done = self.current_state == self.terminal_state
+        self.current_state += sleep_time
+        is_done = self.current_state >= self.terminal_state
         if is_done:
             reward = 10.0
             return self.terminal_state, reward, True, {}
@@ -57,22 +57,51 @@ def make_env():
     return _make
 
 
+class ExtendedReplayBuffer(ReplayBuffer):
+    def append_vectorized_transitions(
+            self, observations, actions, rewards, next_observations, dones
+    ):
+        for observation, action, reward, next_observation, done in zip(
+            observations, actions, rewards, next_observations, dones
+        ):
+            transition = Transition(
+                observation, action, reward, next_observation, done
+            )
+            self.buffer.append(transition)
+
+
 def main():
-    n_env = 5
+    n_env = 8
     env = AsyncVectorEnv(env_fns=[make_env() for _ in range(n_env)])
+    extended_replay_buffer = ExtendedReplayBuffer(capacity=10_000)
 
     total_train_start_time = time.time()
 
-    T = 12
+    T = 20
+    episode_rewards = np.zeros((n_env,))
+    episode_reward_lst = []
+
     observations = env.reset()
+
     for t in range(T):
         actions = env.action_space.sample()
         next_observations, rewards, dones, infos = env.step(actions)
 
-        print("[{0}] Observation: {1}, Action: {2}, "
-              "Reward: {3}, Next Observation: {4}".format(
+        extended_replay_buffer.append_vectorized_transitions(
+            observations, actions, rewards, next_observations, dones
+        )
+        print("[{0:>3}] Observations: {1}, Actions: {2}, "
+              "Rewards: {3}, Next Observations: {4}, Dones: {5}".format(
             t, observations, actions, rewards, next_observations, dones
         ))
+
+        episode_rewards += rewards
+
+        if any(dones):
+            # print(episode_rewards[dones], len(episode_rewards[dones]), "****")
+            episode_reward_lst.extend([episode_reward for episode_reward in episode_rewards[dones]])
+            episode_rewards[dones] = 0.0
+        # print(episode_reward_lst, "##########################")
 
         observations = next_observations
 
