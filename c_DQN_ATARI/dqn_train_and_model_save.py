@@ -32,8 +32,8 @@ if not os.path.exists(MODEL_DIR):
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 Transition = namedtuple(
-    typename='Experience',
-    field_names=['state', 'action', 'reward', 'new_state', 'done']
+    typename='Transition',
+    field_names=['observation', 'action', 'reward', 'next_observation', 'done']
 )
 
 

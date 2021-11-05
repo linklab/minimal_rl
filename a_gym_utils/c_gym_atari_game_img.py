@@ -7,7 +7,8 @@ ENV_NAME = "PongNoFrameskip-v4"
 
 env = gym.make(ENV_NAME)
 env = gym.wrappers.atari_preprocessing.AtariPreprocessing(
-    env, grayscale_obs=True )
+    env, grayscale_obs=True
+)
 env = gym.wrappers.FrameStack(env, num_stack=4, lz4_compress=True)
 
 obs = env.reset()

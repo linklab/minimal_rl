@@ -38,8 +38,8 @@ if not os.path.exists(MODEL_DIR):
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 Transition = namedtuple(
-    typename='Experience',
-    field_names=['state', 'action', 'reward', 'new_state', 'done']
+    typename='Transition',
+    field_names=['observation', 'action', 'reward', 'next_observation', 'done']
 )
 
 
@@ -380,7 +380,7 @@ class DQN():
 
 def main():
     dqn = DQN(
-        use_wandb=False,                            # WANDB 연결 및 로깅 유무
+        use_wandb=True,                            # WANDB 연결 및 로깅 유무
         wandb_entity="link-koreatech",          # WANDB 개인 계정
         max_num_episodes=1000,                  # 훈련을 위한 최대 에피소드 횟수
         batch_size=32,                          # 훈련시 배치에서 한번에 가져오는 랜덤 배치 사이즈

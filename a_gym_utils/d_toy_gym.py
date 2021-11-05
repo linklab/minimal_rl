@@ -85,9 +85,9 @@ def main():
     env = CustomActionWrapper(CustomRewardWrapper(CustomObservationWrapper(
         ToyEnv()
     )))
-    T = 12
+    total_time_steps = 12
     observation = env.reset()
-    for t in range(T):
+    for t in range(total_time_steps):
         action = env.action_space.sample()
         next_observation, reward, done, info = env.step(action)
 

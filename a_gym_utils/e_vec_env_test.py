@@ -1,10 +1,20 @@
 import random
 import time
+from collections import namedtuple
+
 import numpy as np
 import gym
 from gym.vector import SyncVectorEnv, AsyncVectorEnv
 
 from b_DQN.dqn_train_and_model_save import ReplayBuffer, Transition
+
+
+VectorizedTransitions = namedtuple(
+    typename='VectorizedTransitions',
+    field_names=[
+        'observations', 'actions', 'rewards', 'next_observations', 'dones'
+    ]
+)
 
 
 class SleepyToyEnv(gym.Env):
@@ -58,11 +68,9 @@ def make_env():
 
 
 class ExtendedReplayBuffer(ReplayBuffer):
-    def append_vectorized_transitions(
-            self, observations, actions, rewards, next_observations, dones
-    ):
+    def append_rollout_vectorized_transitions(self, vectorized_transitions):
         for observation, action, reward, next_observation, done in zip(
-            observations, actions, rewards, next_observations, dones
+                *vectorized_transitions
         ):
             transition = Transition(
                 observation, action, reward, next_observation, done
@@ -71,28 +79,29 @@ class ExtendedReplayBuffer(ReplayBuffer):
 
 
 def main():
-    n_env = 8
-    env = AsyncVectorEnv(env_fns=[make_env() for _ in range(n_env)])
+    n_envs = 8
+    env = AsyncVectorEnv(env_fns=[make_env() for _ in range(n_envs)])
     extended_replay_buffer = ExtendedReplayBuffer(capacity=10_000)
 
     total_train_start_time = time.time()
 
-    T = 20
-    episode_rewards = np.zeros((n_env,))
+    total_time_steps = 20
+    episode_rewards = np.zeros((n_envs,))
     episode_reward_lst = []
 
     observations = env.reset()
 
-    for t in range(T):
+    for time_step in range(total_time_steps):
         actions = env.action_space.sample()
         next_observations, rewards, dones, infos = env.step(actions)
 
-        extended_replay_buffer.append_vectorized_transitions(
+        transitions = VectorizedTransitions(
             observations, actions, rewards, next_observations, dones
         )
+        extended_replay_buffer.append_vectorized_transitions(transitions)
         print("[{0:>3}] Observations: {1}, Actions: {2}, "
               "Rewards: {3}, Next Observations: {4}, Dones: {5}".format(
-            t, observations, actions, rewards, next_observations, dones
+            time_step, observations, actions, rewards, next_observations, dones
         ))
 
         episode_rewards += rewards
