@@ -2,16 +2,12 @@ import sys
 import os
 import time
 
-from torch.distributions import Categorical
-
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+from a_common.b_models import Policy
 
 import gym
 import numpy as np
 import torch
-import torch.nn.functional as F
 import torch.optim as optim
-import torch.nn as nn
 
 import wandb
 
@@ -24,23 +20,11 @@ PROJECT_HOME = os.path.abspath(os.path.join(CURRENT_PATH, os.pardir))
 if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
 
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+
 MODEL_DIR = os.path.join(PROJECT_HOME, "d_REINFORCE", "models")
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
-
-
-class Policy(nn.Module):
-    def __init__(self):
-        super(Policy, self).__init__()
-        self.fc1 = nn.Linear(4, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, 2)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = F.softmax(self.fc3(x), dim=0)
-        return x
 
 
 class REINFORCE:
@@ -72,8 +56,8 @@ class REINFORCE:
 
         self.buffer = []
 
-        self.pi = Policy()
-        self.optimizer = optim.Adam(self.pi.parameters(), lr=learning_rate)
+        self.policy = Policy()
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
 
         # init rewards
         self.total_rewards = []
@@ -81,17 +65,6 @@ class REINFORCE:
 
         self.total_step_idx = 0
         self.training_steps = 0
-
-    def get_action(self, observation, mode="train"):
-        action_prob = self.pi(torch.from_numpy(observation).float())
-        m = Categorical(probs=action_prob)
-
-        if mode == "train":
-            action = m.sample()
-        else:
-            action = torch.argmax(m.probs)
-
-        return action_prob[action], action.item()
 
     def train_loop(self):
         total_train_start_time = time.time()
@@ -112,7 +85,7 @@ class REINFORCE:
 
             while not done:
                 self.total_step_idx += 1
-                action_prob, action = self.get_action(observation)
+                action_prob, action = self.policy.get_action(observation)
 
                 next_observation, reward, done, _ = self.env.step(action)
 
@@ -233,7 +206,7 @@ class REINFORCE:
             self.total_step_idx, self.training_steps
         ))
         torch.save(
-            self.pi.state_dict(),
+            self.policy.state_dict(),
             os.path.join(MODEL_DIR, "reinforce_{0}_{1:4.1f}_{2:3.1f}.pth".format(
                 self.env_name, test_episode_reward_avg, test_episode_reward_std
             ))
@@ -249,7 +222,7 @@ class REINFORCE:
             observation = self.test_env.reset()
 
             while True:
-                _, action = self.get_action(observation, mode="test")
+                action = self.policy.get_action(observation, mode="test")
 
                 next_observation, reward, done, _ = self.test_env.step(action)
 
@@ -277,12 +250,12 @@ def main():
         test_env=test_env,
         use_wandb=False,                            # WANDB 연결 및 로깅 유무
         wandb_entity="link-koreatech",          # WANDB 개인 계정
-        max_num_episodes=None,                  # 훈련을 위한 최대 에피소드 횟수
-        learning_rate=None,                     # 학습율
-        gamma=None,                             # 감가율
-        print_episode_interval=None,            # Episode 통계 출력에 관한 에피소드 간격
-        test_episode_interval=None,             # 테스트를 위한 episode 간격
-        test_num_episodes=None,                 # 테스트시에 수행하는 에피소드 횟수
+        max_num_episodes=10_000,                 # 훈련을 위한 최대 에피소드 횟수
+        learning_rate=0.0002,                   # 학습율
+        gamma=0.99,                             # 감가율
+        print_episode_interval=10,               # Episode 통계 출력에 관한 에피소드 간격
+        test_episode_interval=50,                # 테스트를 위한 episode 간격
+        test_num_episodes=3,                    # 테스트시에 수행하는 에피소드 횟수
         episode_reward_avg_solved=450,          # 훈련 종료를 위한 테스트 에피소드 리워드의 Average
         episode_reward_std_solved=10            # 훈련 종료를 위한 테스트 에피소드 리워드의 Standard Deviation
     )

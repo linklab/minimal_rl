@@ -46,8 +46,8 @@ def main_env_info():
 
     # Observation = 1: move to grid number 1 (unchanged)
     # Prob = 1: deterministic policy, if we choose to go right, we'll go right
-    print("Observation: {0}, Action: {1}, Reward: {2}, Next Observation: {3}, Done: {4}, Info: {5}".format(
-        observation.shape, action, reward, next_observation.shape, done, info
+    print("Observation: {0}, Action: {1}, Next Observation: {3}, Reward: {2}, Done: {4}, Info: {5}".format(
+        observation.shape, action, next_observation.shape, reward, done, info
     ))
 
     observation = next_observation
@@ -55,8 +55,8 @@ def main_env_info():
     action = 1
     next_observation, reward, done, info = env.step(action)
 
-    print("Observation: {0}, Action: {1}, Reward: {2}, Next Observation: {3}, Done: {4}, Info: {5}".format(
-        observation.shape, action, reward, next_observation.shape, done, info
+    print("Observation: {0}, Action: {1}, Next Observation: {4}, Reward: {3}, Done: {4}, Info: {5}".format(
+        observation.shape, action, next_observation.shape, reward, done, info
     ))
 
     print("*" * 80)
@@ -72,8 +72,8 @@ def main_env_info():
     for action in actions:
         next_observation, reward, done, info = env.step(action)
         env.render()
-        print("Observation: {0}, Action: {1}, Reward: {2}, Next Observation: {3}, Done: {4}, Info: {5}".format(
-            observation.shape, action, reward, next_observation.shape, done, info
+        print("Observation: {0}, Action: {1}, Next Observation: {2}, Reward: {3}, Done: {4}, Info: {5}".format(
+            observation.shape, action, next_observation.shape, reward, done, info
         ))
         observation = next_observation
 

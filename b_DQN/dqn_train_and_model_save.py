@@ -1,17 +1,9 @@
 # https://www.deeplearningwizard.com/deep_learning/deep_reinforcement_learning_pytorch/dynamic_programming_frozenlake/
 # -*- coding: utf-8 -*-
-import collections
 import time
-from collections import namedtuple
 import random
 import sys
 import os
-from typing import Tuple
-
-from torch import nn
-
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-
 import gym
 import numpy as np
 import torch
@@ -20,93 +12,28 @@ import torch.optim as optim
 
 import wandb
 
+CURRENT_PATH = os.path.dirname(os.path.realpath(__file__))
+PROJECT_HOME = os.path.abspath(os.path.join(CURRENT_PATH, os.pardir))
+if PROJECT_HOME not in sys.path:
+    sys.path.append(PROJECT_HOME)
+
+from a_common.b_models import QNet
+from a_common.c_buffers import ReplayBuffer
+from a_common.a_commons import Transition
+
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
 
 ENV_NAME = "CartPole-v1"
 
-CURRENT_PATH = os.path.dirname(os.path.realpath(__file__))
-PROJECT_HOME = os.path.abspath(os.path.join(CURRENT_PATH, os.pardir))
-if PROJECT_HOME not in sys.path:
-    sys.path.append(PROJECT_HOME)
-
 MODEL_DIR = os.path.join(PROJECT_HOME, "b_DQN", "models")
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-Transition = namedtuple(
-    typename='Transition',
-    field_names=['observation', 'action', 'reward', 'next_observation', 'done']
-)
-
-
-class Qnet(nn.Module):
-    def __init__(self):
-        super(Qnet, self).__init__()
-        self.fc1 = nn.Linear(4, 128)  # fully connected
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, 2)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-    def get_action(self, obs, epsilon):
-        out = self.forward(obs)
-
-        coin = random.random() # 0.0과 1.0사이의 임의의 값을 반환
-        if coin < epsilon:
-            return random.randint(0, 1)
-        else:
-            return out.argmax().item()  # argmax: 더 큰 값에 대응되는 인덱스 반환
-
-
-class ReplayBuffer:
-    def __init__(self, capacity):
-        self.buffer = collections.deque(maxlen=capacity)
-
-    def __len__(self):
-        return len(self.buffer)
-
-    def size(self):
-        return len(self.buffer)
-
-    def append(self, transition: Transition) -> None:
-        self.buffer.append(transition)
-
-    def pop(self):
-        return self.buffer.pop()
-
-    def reset(self):
-        self.buffer.clear()
-
-    def sample(self, batch_size: int) -> Tuple:
-        # Get index
-        indices = np.random.choice(len(self.buffer), size=batch_size, replace=False)
-
-        # Sample
-        states, actions, rewards, next_states, dones = zip(*[self.buffer[idx] for idx in indices])
-
-        # Convert to ndarray for speed up cuda
-        states = np.array(states)
-        actions = np.array(actions)
-        rewards = np.array(rewards, dtype=np.float32)
-        next_states = np.array(next_states)
-        dones = np.array(dones, dtype=bool)
-
-        # Convert to tensor
-        states = torch.tensor(states, dtype=torch.float32, device=DEVICE)
-        actions = torch.tensor(actions, dtype=torch.int64, device=DEVICE)
-        rewards = torch.tensor(rewards, dtype=torch.float32, device=DEVICE)
-        next_states = torch.tensor(next_states, dtype=torch.float32, device=DEVICE)
-        dones = torch.tensor(dones, dtype=torch.bool, device=DEVICE)
-
-        return states, actions, rewards, next_states, dones
 
 
 class DQN():
@@ -150,12 +77,12 @@ class DQN():
         self.test_env = gym.make(ENV_NAME)
 
         # network
-        self.q = Qnet().to(DEVICE)
-        self.target_q = Qnet().to(DEVICE)
+        self.q = QNet().to(DEVICE)
+        self.target_q = QNet().to(DEVICE)
         self.optimizer = optim.Adam(self.q.parameters(), lr=self.learning_rate)
 
         # agent
-        self.replay_buffer = ReplayBuffer(self.replay_buffer_size)
+        self.replay_buffer = ReplayBuffer(self.replay_buffer_size, device=DEVICE)
 
         # init rewards
         self.total_rewards = []
@@ -216,7 +143,7 @@ class DQN():
                 next_observation, reward, done, _ = self.env.step(action)
 
                 transition = Transition(
-                    observation, action, reward, next_observation, done
+                    observation, action, next_observation, reward, done
                 )
                 self.replay_buffer.append(transition)
 
@@ -302,10 +229,12 @@ class DQN():
 
         batch = self.replay_buffer.sample(self.batch_size)
 
-        # states.shape: torch.Size([32, 4, 84, 84]), actions.shape: torch.Size([32]),
-        # rewards.shape: torch.Size([32]), next_states.shape: torch.Size([32, 4, 84, 84]),
+        # states.shape: torch.Size([32, 4, 84, 84]),
+        # actions.shape: torch.Size([32]),
+        # next_states.shape: torch.Size([32, 4, 84, 84]),
+        # rewards.shape: torch.Size([32]),
         # dones.shape: torch.Size([32])
-        states, actions, rewards, next_states, dones = batch
+        states, actions, next_states, rewards, dones = batch
 
         # state_action_values.shape: torch.Size([32])
         state_action_values = self.q(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
@@ -321,9 +250,8 @@ class DQN():
 
         loss = F.mse_loss(state_action_values, target_state_action_values)
 
-        # print("states.shape: {0}, actions.shape: {1}, rewards.shape: {2}, "
-        #       "next_states.shape: {3}, dones.shape: {4}".format(
-        #     states.shape, actions.shape, rewards.shape, next_states.shape, dones.shape
+        # print("states.shape: {0}, actions.shape: {1}, next_states.shape: {2}, rewards.shape: {3}, dones.shape: {4}".format(
+        #     states.shape, actions.shape, next_states.shape, rewards.shape, dones.shape
         # ))
         # print("state_action_values.shape: {0}".format(state_action_values.shape))
         # print("next_state_values.shape: {0}".format(next_state_values.shape))
@@ -380,7 +308,7 @@ class DQN():
 
 def main():
     dqn = DQN(
-        use_wandb=True,                            # WANDB 연결 및 로깅 유무
+        use_wandb=False,                            # WANDB 연결 및 로깅 유무
         wandb_entity="link-koreatech",          # WANDB 개인 계정
         max_num_episodes=1000,                  # 훈련을 위한 최대 에피소드 횟수
         batch_size=32,                          # 훈련시 배치에서 한번에 가져오는 랜덤 배치 사이즈

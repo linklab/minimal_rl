@@ -8,7 +8,7 @@ import gym
 import torch
 import os
 
-from b_DQN.dqn_train_and_model_save import Qnet
+from a_common.b_models import QNet
 
 ENV_NAME = "CartPole-v1"
 
@@ -20,24 +20,6 @@ if PROJECT_HOME not in sys.path:
 MODEL_DIR = os.path.join(PROJECT_HOME, "b_DQN", "models")
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def get_action(q, observation, epsilon):
-    if random.random() < epsilon:
-        action = random.randint(0, 1)
-    else:
-        # Convert to Tensor
-        observation = torch.tensor(observation, dtype=torch.float32, device=DEVICE)
-
-        # Add batch-dim
-        if len(observation.shape) == 3:
-            observation = observation.unsqueeze(dim=0)
-
-        q_values = q(observation)
-        action = torch.argmax(q_values, dim=-1)
-        action = int(action.item())
-
-    return action
 
 
 def play(env, q, num_episodes):
@@ -52,7 +34,7 @@ def play(env, q, num_episodes):
 
         while True:
             episode_steps += 1
-            action = get_action(q, observation, epsilon=0.0)
+            action = q.get_action(observation, epsilon=0.0)
 
             # action을 통해서 next_state, reward, done, info를 받아온다
             next_observation, reward, done, _ = env.step(action)
@@ -73,7 +55,7 @@ def play(env, q, num_episodes):
 def main_q_play(num_episodes):
     env = gym.make(ENV_NAME)
 
-    q = Qnet().to(DEVICE)
+    q = QNet().to(DEVICE)
     model_params = torch.load(
         os.path.join(MODEL_DIR, "dqn_CartPole-v1_500.0_0.0.pth")
     )

@@ -1,6 +1,3 @@
-# https://www.deeplearningwizard.com/deep_learning/deep_reinforcement_learning_pytorch/dynamic_programming_frozenlake/
-# -*- coding: utf-8 -*-
-import random
 import sys
 import time
 
@@ -15,18 +12,11 @@ PROJECT_HOME = os.path.abspath(os.path.join(CURRENT_PATH, os.pardir))
 if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
 
-from d_REINFORCE.REINFORCE_train_and_model_save import Policy
+from a_common.b_models import Policy
 
 MODEL_DIR = os.path.join(PROJECT_HOME, "d_REINFORCE", "models")
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def get_action(pi, observation):
-    action_prob = pi(torch.from_numpy(observation).float())
-    m = Categorical(action_prob)
-    action = m.sample()
-    return action_prob, action.item()
 
 
 def play(env, pi, num_episodes):
@@ -41,7 +31,7 @@ def play(env, pi, num_episodes):
 
         while True:
             episode_steps += 1
-            _, action = get_action(pi, observation)
+            action = pi.get_action(observation, mode="test")
 
             # action을 통해서 next_state, reward, done, info를 받아온다
             next_observation, reward, done, _ = env.step(action)
