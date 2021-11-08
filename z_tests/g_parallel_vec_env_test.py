@@ -8,12 +8,12 @@ from a_common.b_models import Policy
 from a_common.c_buffers import ReplayBufferForParallelVectorizedEnvs
 
 
-def rollout(n_envs, policy, queue, total_time_steps):
+def rollout(n_envs, policy, queue, time_steps):
     env = AsyncVectorEnv(env_fns=[make_env for _ in range(n_envs)])
 
     observations = env.reset()
 
-    for time_step in range(total_time_steps):
+    for time_step in range(time_steps):
         actions = policy.get_action(observations)
         next_observations, rewards, dones, infos = env.step(actions)
 
@@ -97,7 +97,7 @@ def learning(n_envs, policy, queue, n_actors, buffer_capacity):
 def main():
     n_envs = 4
     n_actors = 2
-    total_time_steps = 10
+    time_steps = 10
     buffer_capacity = 1000
 
     queue = mp.SimpleQueue()
@@ -108,7 +108,7 @@ def main():
     for _ in range(n_actors):
         actor = mp.Process(
             target=rollout,
-            args=(n_envs, policy, queue, total_time_steps)
+            args=(n_envs, policy, queue, time_steps)
         )
         actors.append(actor)
         actor.start()

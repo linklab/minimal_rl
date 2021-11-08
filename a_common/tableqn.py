@@ -54,7 +54,7 @@ def q_table_learning(num_episodes=200, alpha=0.1, gamma=0.95, epsilon=0.1):
 
     episode_reward_list = []
 
-    training_steps = 0
+    training_time_steps = 0
     last_episode_reward = 0
 
     for i in range(num_episodes):
@@ -83,7 +83,7 @@ def q_table_learning(num_episodes=200, alpha=0.1, gamma=0.95, epsilon=0.1):
             q_table[observation, action] = q_table[observation, action] + alpha * (reward + gamma * np.max(q_table[next_observation, :]) - q_table[observation, action])
             #episode_reward += (gamma ** (episode_step - 1)) * reward
             episode_reward += reward  # episode_reward 를 산출하는 방법은 감가률 고려하지 않는 이 라인이 더 올바름.
-            training_steps += 1  # Q-table 업데이트 횟수
+            training_time_steps += 1  # Q-table 업데이트 횟수
             episode_reward_list.append(last_episode_reward)
 
             sList.append(next_observation)
@@ -95,7 +95,7 @@ def q_table_learning(num_episodes=200, alpha=0.1, gamma=0.95, epsilon=0.1):
 
         last_episode_reward = episode_reward
 
-    return q_table, training_steps, episode_reward_list
+    return q_table, training_time_steps, episode_reward_list
 
 
 def q_table_testing(num_episodes, q_table):
@@ -187,7 +187,7 @@ def main_q_table_learning():
     GAMMA = 0.95
     EPSILON = 0.1
 
-    q_table, training_steps, episode_reward_list = q_table_learning(NUM_EPISODES, ALPHA, GAMMA, EPSILON)
+    q_table, training_time_steps, episode_reward_list = q_table_learning(NUM_EPISODES, ALPHA, GAMMA, EPSILON)
     print("\nFinal Q-Table Values")
     print("    LEFT   DOWN  RIGHT     UP")
     for idx, observation in enumerate(q_table):
@@ -196,7 +196,7 @@ def main_q_table_learning():
             print("{0:5.3f} ".format(action_state), end=" ")
         print()
 
-    plt.plot(range(training_steps), episode_reward_list, color="Blue")
+    plt.plot(range(training_time_steps), episode_reward_list, color="Blue")
     plt.xlabel("training steps")
     plt.ylabel("episode reward")
     plt.show()

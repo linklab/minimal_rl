@@ -11,7 +11,7 @@ def rl_main():
     policy = Policy(n_features=4, n_actions=3)
     replay_buffer = ReplayBuffer(capacity=1000)
 
-    total_time_steps = 10
+    time_steps = 10
     episode_reward = 0.0
     num_train_steps = 0
 
@@ -19,7 +19,7 @@ def rl_main():
 
     observation = env.reset()
 
-    for time_step in range(total_time_steps):
+    for time_step in range(time_steps):
         action = policy.get_action(observation)
         next_observation, reward, done, info = env.step(action)
 

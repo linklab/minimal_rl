@@ -116,6 +116,17 @@ class Policy(nn.Module):
         self.device = device
 
     def forward(self, x):
+
+        # x = [1.0, 0.5, 0.8, 0.8]  --> [1.7, 2.3] --> [0.3, 0.7]
+
+        # x = [
+        #  [1.0, 0.5, 0.8, 0.8]
+        #  [1.0, 0.5, 0.8, 0.8]
+        #  [1.0, 0.5, 0.8, 0.8]
+        #  ...
+        #  [1.0, 0.5, 0.8, 0.8]
+        # ]
+
         if isinstance(x, np.ndarray):
             x = torch.tensor(x, dtype=torch.float32, device=self.device)
         x = F.relu(self.fc1(x))
@@ -134,7 +145,7 @@ class Policy(nn.Module):
         return action.numpy()
 
     def get_action_with_action_prob(self, x, mode="train"):
-        action_prob = self.forward(x)
+        action_prob = self.forward(x)   # [0.3, 0.7]
         m = Categorical(probs=action_prob)
 
         if mode == "train":

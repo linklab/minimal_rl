@@ -17,7 +17,7 @@ def rl_main():
         capacity=10_000
     )
 
-    total_time_steps = 10
+    time_steps = 10
     episode_rewards = np.zeros((n_envs,))
     episode_reward_lst = []
     num_train_steps = 0
@@ -26,7 +26,7 @@ def rl_main():
 
     observations = env.reset()
 
-    for time_step in range(total_time_steps):
+    for time_step in range(time_steps):
         actions = policy.get_action(observations)
         next_observations, rewards, dones, infos = env.step(actions)
 

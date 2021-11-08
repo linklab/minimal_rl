@@ -86,10 +86,10 @@ class DQN():
 
         # init rewards
         self.episode_reward_lst = []
-        self.best_mean_reward = -1000000000
+        self.best_test_mean_episode_reward = -1000000000
 
-        self.total_time_steps = 0
-        self.training_steps = 0
+        self.time_steps = 0
+        self.training_time_steps = 0
 
     def get_action(self, observation, epsilon):
         if random.random() < epsilon:
@@ -135,7 +135,7 @@ class DQN():
             observation = self.env.reset()
 
             while True:
-                self.total_time_steps += 1
+                self.time_steps += 1
 
                 action = self.get_action(observation, epsilon)
 
@@ -147,7 +147,7 @@ class DQN():
                 )
                 self.replay_buffer.append(transition)
 
-                if self.total_time_steps > self.min_buffer_size_for_training:
+                if self.time_steps > self.min_buffer_size_for_training:
                     loss = self.train_step()
 
                 episode_reward += reward
@@ -163,7 +163,7 @@ class DQN():
                         '%H:%M:%S', time.gmtime(total_training_time)
                     )
 
-                    if self.training_steps > 0 and n_episode % self.test_episode_interval == 0:
+                    if self.training_time_steps > 0 and n_episode % self.test_episode_interval == 0:
                         test_episode_reward_avg, test_episode_reward_std = self.q_testing(
                             self.test_num_episodes
                         )
@@ -179,7 +179,7 @@ class DQN():
 
                         if all(termination_conditions):
                             print("Solved in {0} steps ({1} training steps)!".format(
-                                self.total_time_steps, self.training_steps
+                                self.time_steps, self.training_time_steps
                             ))
                             self.model_save(
                                 test_episode_reward_avg, test_episode_reward_std
@@ -189,7 +189,7 @@ class DQN():
                     if n_episode % self.print_episode_interval == 0:
                         print(
                             "[Episode {:3}, Steps {:6}]".format(
-                                n_episode + 1, self.total_time_steps
+                                n_episode + 1, self.time_steps
                             ),
                             "Episode Reward: {:>5},".format(episode_reward),
                             "Mean Episode Reward: {:.3f},".format(mean_episode_reward),
@@ -198,7 +198,7 @@ class DQN():
                             ),
                             "Loss: {:.3f},".format(loss),
                             "Epsilon: {:.2f},".format(epsilon),
-                            "Num Training Steps: {:4},".format(self.training_steps),
+                            "Num Training Steps: {:4},".format(self.training_time_steps),
                             "Total Elapsed Time {}".format(total_training_time)
                         )
 
@@ -212,7 +212,7 @@ class DQN():
                             "Mean Episode Reward": mean_episode_reward,
                             "Episode": n_episode,
                             "Size of replay buffer": self.replay_buffer.size(),
-                            "Number of Training Steps": self.training_steps
+                            "Number of Training Steps": self.training_time_steps
                         })
 
                     break
@@ -225,7 +225,7 @@ class DQN():
         print("Total Training End : {}".format(total_training_time))
 
     def train_step(self):
-        self.training_steps += 1
+        self.training_time_steps += 1
 
         batch = self.replay_buffer.sample(self.batch_size)
 
@@ -264,14 +264,14 @@ class DQN():
         self.optimizer.step()
 
         # sync
-        if self.total_time_steps % self.target_sync_step_interval == 0:
+        if self.time_steps % self.target_sync_step_interval == 0:
             self.target_q.load_state_dict(self.q.state_dict())
 
         return loss.item()
 
     def model_save(self, test_episode_reward_avg, test_episode_reward_std):
         print("Solved in {0} steps ({1} training steps)!".format(
-            self.total_time_steps, self.training_steps
+            self.time_steps, self.training_time_steps
         ))
         torch.save(
             self.q.state_dict(),

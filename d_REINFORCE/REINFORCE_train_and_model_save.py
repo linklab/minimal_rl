@@ -61,10 +61,10 @@ class REINFORCE:
 
         # init rewards
         self.episode_reward_lst = []
-        self.best_mean_reward = -1000000000
+        self.best_test_mean_episode_reward = -1000000000
 
-        self.total_time_steps = 0
-        self.training_steps = 0
+        self.time_steps = 0
+        self.training_time_steps = 0
 
     def train_loop(self):
         total_train_start_time = time.time()
@@ -72,7 +72,7 @@ class REINFORCE:
         test_episode_reward_avg = 0.0
         test_episode_reward_std = 0.0
 
-        is_terminated = False
+        is_terminated = False  # Flag(깃발) Variable
 
         for n_episode in range(self.max_num_episodes):
             episode_start_time = time.time()
@@ -81,10 +81,10 @@ class REINFORCE:
             # Environment 초기화와 변수 초기화
             observation = self.env.reset()
 
-            done = False
+            done = False  # Flag Variable
 
             while not done:
-                self.total_time_steps += 1
+                self.time_steps += 1
                 action, action_prob_selected = self.policy.get_action_with_action_prob(
                     observation
                 )
@@ -102,7 +102,7 @@ class REINFORCE:
 
             mean_episode_reward = np.mean(self.episode_reward_lst[-100:])
 
-            if self.training_steps > 0 and n_episode % self.test_episode_interval == 0:
+            if self.training_time_steps > 0 and n_episode % self.test_episode_interval == 0:
                 test_episode_reward_avg, test_episode_reward_std = self.reinforce_testing(
                     self.test_num_episodes
                 )
@@ -118,7 +118,7 @@ class REINFORCE:
 
                 if all(termination_conditions):
                     print("Solved in {0} steps ({1} training steps)!".format(
-                        self.total_time_steps, self.training_steps
+                        self.time_steps, self.training_time_steps
                     ))
                     self.model_save(
                         test_episode_reward_avg, test_episode_reward_std
@@ -136,7 +136,7 @@ class REINFORCE:
             if n_episode % self.print_episode_interval == 0:
                 print(
                     "[Episode {:3}, Steps {:6}, Training Steps {:6}]".format(
-                        n_episode + 1, self.total_time_steps, self.training_steps
+                        n_episode + 1, self.time_steps, self.training_time_steps
                     ),
                     "Episode Reward: {:>5},".format(episode_reward),
                     "Mean Episode Reward: {:.3f},".format(mean_episode_reward),
@@ -153,7 +153,7 @@ class REINFORCE:
                     "Episode": n_episode,
                     "Objective": objective if objective != 0.0 else 0.0,
                     "Mean Episode Reward": mean_episode_reward,
-                    "Number of Training Steps": self.training_steps,
+                    "Number of Training Steps": self.training_time_steps,
                 })
 
             if is_terminated:
@@ -164,7 +164,7 @@ class REINFORCE:
         print("Total Training End : {}".format(total_training_time))
 
     def train_step(self):
-        self.training_steps += 1
+        self.training_time_steps += 1
 
         G = 0
         policy_gradient = torch.tensor(0.0, dtype=torch.float32)
@@ -184,7 +184,7 @@ class REINFORCE:
         return G
 
     def train_step_2(self):
-        self.training_steps += 1
+        self.training_time_steps += 1
 
         G = 0
         policy_gradient = torch.tensor(0.0, dtype=torch.float32)
@@ -205,7 +205,7 @@ class REINFORCE:
 
     def model_save(self, test_episode_reward_avg, test_episode_reward_std):
         print("Solved in {0} steps ({1} training steps)!".format(
-            self.total_time_steps, self.training_steps
+            self.time_steps, self.training_time_steps
         ))
         torch.save(
             self.policy.state_dict(),
