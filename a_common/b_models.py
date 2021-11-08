@@ -145,3 +145,40 @@ class Policy(nn.Module):
             action_prob_selected = None
         return action.numpy(), action_prob_selected
 
+
+class ActorCritic(nn.Module):
+    def __init__(self, n_features=4, n_actions=2, device=torch.device("cpu")):
+        super(ActorCritic, self).__init__()
+        self.fc1 = nn.Linear(n_features, 128)
+        self.fc2 = nn.Linear(128, 128)
+        self.fc_pi = nn.Linear(128, n_actions)
+        self.fc_v = nn.Linear(128, 1)
+        self.device = device
+
+    def forward(self, x):
+        if isinstance(x, np.ndarray):
+            x = torch.tensor(x, dtype=torch.float32, device=self.device)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        return x
+
+    def pi(self, x, softmax_dim=1):
+        x = self.forward(x)
+        x = self.fc_pi(x)
+        prob = F.softmax(x, dim=softmax_dim)
+        return prob
+
+    def v(self, x):
+        x = self.forward(x)
+        v = self.fc_v(x)
+        return v
+
+    def get_action(self, x, mode="train"):
+        action_prob = self.pi(x)
+        m = Categorical(probs=action_prob)
+
+        if mode == "train":
+            action = m.sample()
+        else:
+            action = torch.argmax(m.probs, dim=1 if action_prob.dim() == 2 else 0)
+        return action.numpy()

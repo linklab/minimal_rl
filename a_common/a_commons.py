@@ -17,6 +17,7 @@ VectorizedTransitions = namedtuple(
     ]
 )
 
+
 ParallelVectorizedTransitions = namedtuple(
     typename='ParallelVectorizedTransitions',
     field_names=[
@@ -115,10 +116,12 @@ class CustomActionWrapper(gym.ActionWrapper):
 
 
 def make_env():
-    # env = gym.make("CartPole-v0")
     env = CustomActionWrapper(CustomRewardWrapper(CustomObservationWrapper(
         SleepyToyEnv()
     )))
     return env
 
 
+def make_cart_pole_env():
+    env = gym.make("CartPole-v0")
+    return env

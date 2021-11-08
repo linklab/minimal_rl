@@ -67,6 +67,9 @@ class ReplayBufferForVectorizedEnvs(ReplayBuffer):
             )
             self.buffer.append(transition)
 
+    def sample_all(self):
+        return self.sample(batch_size=len(self.buffer))
+
 
 class ReplayBufferForParallelVectorizedEnvs(ReplayBuffer):
     def append(self, parallel_vectorized_transitions):

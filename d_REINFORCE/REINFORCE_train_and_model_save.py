@@ -2,8 +2,6 @@ import sys
 import os
 import time
 
-from a_common.b_models import Policy
-
 import gym
 import numpy as np
 import torch
@@ -19,6 +17,8 @@ CURRENT_PATH = os.path.dirname(os.path.realpath(__file__))
 PROJECT_HOME = os.path.abspath(os.path.join(CURRENT_PATH, os.pardir))
 if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
+
+from a_common.b_models import Policy
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
@@ -60,10 +60,10 @@ class REINFORCE:
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
 
         # init rewards
-        self.total_rewards = []
+        self.episode_reward_lst = []
         self.best_mean_reward = -1000000000
 
-        self.total_step_idx = 0
+        self.total_time_steps = 0
         self.training_steps = 0
 
     def train_loop(self):
@@ -84,7 +84,7 @@ class REINFORCE:
             done = False
 
             while not done:
-                self.total_step_idx += 1
+                self.total_time_steps += 1
                 action, action_prob_selected = self.policy.get_action_with_action_prob(
                     observation
                 )
@@ -98,29 +98,9 @@ class REINFORCE:
             # TRAIN
             objective = self.train_step()
 
-            self.total_rewards.append(episode_reward)
+            self.episode_reward_lst.append(episode_reward)
 
-            per_episode_time = time.time() - episode_start_time
-            per_episode_time = time.strftime('%H:%M:%S', time.gmtime(per_episode_time))
-
-            mean_episode_reward = np.mean(self.total_rewards[-100:])
-
-            total_training_time = time.time() - total_train_start_time
-            total_training_time = time.strftime(
-                '%H:%M:%S', time.gmtime(total_training_time)
-            )
-
-            if n_episode % self.print_episode_interval == 0:
-                print(
-                    "[Episode {:3}, Steps {:6}]".format(
-                        n_episode, self.total_step_idx
-                    ),
-                    "Episode Reward: {:>5},".format(episode_reward),
-                    "Mean Episode Reward: {:.3f},".format(mean_episode_reward),
-                    "Objective: {:.3f},".format(objective),
-                    "Per-Episode Time: {}".format(per_episode_time),
-                    "Total Elapsed Time {}".format(total_training_time)
-                )
+            mean_episode_reward = np.mean(self.episode_reward_lst[-100:])
 
             if self.training_steps > 0 and n_episode % self.test_episode_interval == 0:
                 test_episode_reward_avg, test_episode_reward_std = self.reinforce_testing(
@@ -138,12 +118,32 @@ class REINFORCE:
 
                 if all(termination_conditions):
                     print("Solved in {0} steps ({1} training steps)!".format(
-                        self.total_step_idx, self.training_steps
+                        self.total_time_steps, self.training_steps
                     ))
                     self.model_save(
                         test_episode_reward_avg, test_episode_reward_std
                     )
                     is_terminated = True
+
+            per_episode_time = time.time() - episode_start_time
+            per_episode_time = time.strftime('%H:%M:%S', time.gmtime(per_episode_time))
+
+            total_training_time = time.time() - total_train_start_time
+            total_training_time = time.strftime(
+                '%H:%M:%S', time.gmtime(total_training_time)
+            )
+
+            if n_episode % self.print_episode_interval == 0:
+                print(
+                    "[Episode {:3}, Steps {:6}, Training Steps {:6}]".format(
+                        n_episode + 1, self.total_time_steps, self.training_steps
+                    ),
+                    "Episode Reward: {:>5},".format(episode_reward),
+                    "Mean Episode Reward: {:.3f},".format(mean_episode_reward),
+                    "Objective: {:.3f},".format(objective),
+                    "Per-Episode Time: {}".format(per_episode_time),
+                    "Total Elapsed Time {}".format(total_training_time)
+                )
 
             if self.use_wandb:
                 self.wandb.log({
@@ -205,7 +205,7 @@ class REINFORCE:
 
     def model_save(self, test_episode_reward_avg, test_episode_reward_std):
         print("Solved in {0} steps ({1} training steps)!".format(
-            self.total_step_idx, self.training_steps
+            self.total_time_steps, self.training_steps
         ))
         torch.save(
             self.policy.state_dict(),

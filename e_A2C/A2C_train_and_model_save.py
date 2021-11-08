@@ -77,10 +77,10 @@ class REINFORCE:
         self.optimizer = optim.Adam(self.pi.parameters(), lr=learning_rate)
 
         # init rewards
-        self.total_rewards = []
+        self.episode_reward_lst = []
         self.best_mean_reward = -1000000000
 
-        self.total_step_idx = 0
+        self.total_time_steps = 0
         self.training_steps = 0
 
     def train_net(self):
@@ -116,7 +116,7 @@ class REINFORCE:
             observation = self.env.reset()
 
             while True:
-                self.total_step_idx += 1
+                self.total_time_steps += 1
                 action_prob, action = self.get_action(observation)
 
                 next_observation, reward, done, _ = self.env.step(action)
@@ -132,12 +132,12 @@ class REINFORCE:
             loss = self.train_net()
             self.training_steps = n_episode
 
-            self.total_rewards.append(episode_reward)
+            self.episode_reward_lst.append(episode_reward)
 
             per_episode_time = time.time() - episode_start_time
             per_episode_time = time.strftime('%H:%M:%S', time.gmtime(per_episode_time))
 
-            mean_episode_reward = np.mean(self.total_rewards[-100:])
+            mean_episode_reward = np.mean(self.episode_reward_lst[-100:])
 
             total_training_time = time.time() - total_train_start_time
             total_training_time = time.strftime(
@@ -147,7 +147,7 @@ class REINFORCE:
             if n_episode % self.print_episode_interval == 0:
                 print(
                     "[Episode {:3}, Steps {:6}]".format(
-                        n_episode, self.total_step_idx
+                        n_episode, self.total_time_steps
                     ),
                     "Episode Reward: {:>5},".format(episode_reward),
                     "Mean Episode Reward: {:.3f},".format(mean_episode_reward),
@@ -172,7 +172,7 @@ class REINFORCE:
 
                 if all(termination_conditions):
                     print("Solved in {0} steps ({1} training steps)!".format(
-                        self.total_step_idx, self.training_steps
+                        self.total_time_steps, self.training_steps
                     ))
                     self.model_save(
                         test_episode_reward_avg, test_episode_reward_std
@@ -184,7 +184,7 @@ class REINFORCE:
 
     def model_save(self, test_episode_reward_avg, test_episode_reward_std):
         print("Solved in {0} steps ({1} training steps)!".format(
-            self.total_step_idx, self.training_steps
+            self.total_time_steps, self.training_steps
         ))
         torch.save(
             self.pi.state_dict(),
