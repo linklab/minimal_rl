@@ -42,8 +42,8 @@ class SleepyToyEnv(gym.Env):
 
     def __init__(self):
         super(SleepyToyEnv, self).__init__()
-        self.observation_space = gym.spaces.Discrete(n=4)
-        self.action_space = gym.spaces.Discrete(n=3)
+        self.observation_space = gym.spaces.Discrete(n=4)  # 0, 1, 2, 3
+        self.action_space = gym.spaces.Discrete(n=3) # 0, 1, 2
         self.current_state = -1
         self.terminal_state = 4
         self.max_sleep_time = 2
@@ -84,13 +84,13 @@ class CustomObservationWrapper(gym.ObservationWrapper):
         self.discrete_observation_space_n = self.observation_space.n
         self.observation_space = gym.spaces.Box(
             low=0, high=1, shape=(self.discrete_observation_space_n,)
-        )
+        )  # [0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]
 
-    def observation(self, obs):
+    def observation(self, obs):  # Observation --> One-hot vector
         if obs is None:
             return None
-        new_obs = np.zeros(self.discrete_observation_space_n)
-        new_obs[obs] = 1
+        new_obs = np.zeros(self.discrete_observation_space_n) # [0, 0, 0, 0]
+        new_obs[obs] = 1  # [0, 1, 0, 0]
         return new_obs
 
 
@@ -116,6 +116,8 @@ class CustomActionWrapper(gym.ActionWrapper):
 
 
 def make_env():
+    # env = SleepyToyEnv()
+
     env = CustomActionWrapper(CustomRewardWrapper(CustomObservationWrapper(
         SleepyToyEnv()
     )))
