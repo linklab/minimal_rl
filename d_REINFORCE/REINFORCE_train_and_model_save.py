@@ -85,11 +85,13 @@ class REINFORCE:
 
             while not done:
                 self.total_step_idx += 1
-                action_prob, action = self.policy.get_action(observation)
+                action, action_prob_selected = self.policy.get_action_with_action_prob(
+                    observation
+                )
 
                 next_observation, reward, done, _ = self.env.step(action)
 
-                self.buffer.append((reward, action_prob))
+                self.buffer.append((reward, action_prob_selected))
                 observation = next_observation
                 episode_reward += reward
 

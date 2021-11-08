@@ -133,3 +133,15 @@ class Policy(nn.Module):
             action = torch.argmax(m.probs, dim=1 if action_prob.dim() == 2 else 0)
         return action.numpy()
 
+    def get_action_with_action_prob(self, x, mode="train"):
+        action_prob = self.forward(x)
+        m = Categorical(probs=action_prob)
+
+        if mode == "train":
+            action = m.sample()
+            action_prob_selected = action_prob[action]
+        else:
+            action = torch.argmax(m.probs, dim=1 if action_prob.dim() == 2 else 0)
+            action_prob_selected = None
+        return action.numpy(), action_prob_selected
+
