@@ -9,7 +9,7 @@ from a_common.c_buffers import ReplayBufferForVectorizedEnvs
 
 
 def rl_main():
-    n_envs = 4
+    n_envs = 60
     env = AsyncVectorEnv(env_fns=[make_env for _ in range(n_envs)])
     policy = Policy(n_features=4, n_actions=3)
 
@@ -21,6 +21,10 @@ def rl_main():
     episode_rewards = np.zeros((n_envs,))
     episode_reward_lst = []
     num_train_steps = 0
+
+    print("******************************************")
+    print("Total numbers of envs: {0}".format(n_envs))
+    print("******************************************")
 
     total_train_start_time = time.time()
 

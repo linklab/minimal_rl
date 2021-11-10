@@ -21,16 +21,16 @@ VectorizedTransitions = namedtuple(
 ParallelVectorizedTransitions = namedtuple(
     typename='ParallelVectorizedTransitions',
     field_names=[
-        'time_step', 'observations', 'actions', 'next_observations', 'rewards',
-        'dones', 'infos'
+        'actor_id', 'time_step', 'observations', 'actions', 'next_observations',
+        'rewards', 'dones', 'infos'
     ]
 )
 
 NStepParallelVectorizedTransition = namedtuple(
     typename='NStepParallelVectorizedTransition',
     field_names=[
-        'time_step', 'observation', 'action', 'next_observation', 'reward',
-        'done', 'info'
+        'actor_id', 'time_step', 'observation', 'action', 'next_observation',
+        'reward', 'done', 'info'
     ]
 )
 
