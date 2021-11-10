@@ -44,7 +44,7 @@ class Policy(nn.Module):
         return x
 
 
-class REINFORCE:
+class A2C:
     def __init__(
             self, env_name, env, test_env, use_wandb, wandb_entity,
             max_num_episodes, learning_rate, gamma,
@@ -57,7 +57,7 @@ class REINFORCE:
         if self.use_wandb:
             self.wandb = wandb.init(
                 entity=wandb_entity,
-                project="REINFOCE_{0}".format(self.env_name)
+                project="A2C_{0}".format(self.env_name)
             )
         self.max_num_episodes = max_num_episodes
         self.gamma = gamma
@@ -225,7 +225,7 @@ def main():
     env = gym.make(ENV_NAME)
     test_env = gym.make(ENV_NAME)
 
-    reinforce = REINFORCE(
+    reinforce = A2C(
         env_name=ENV_NAME,
         env=env,
         test_env=test_env,
