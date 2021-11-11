@@ -27,7 +27,7 @@ class ReplayBuffer:
     def pop(self):
         return self.buffer.pop()
 
-    def reset(self):
+    def clear(self):
         self.buffer.clear()
 
     def sample(self, batch_size: int) -> Tuple:
@@ -47,7 +47,11 @@ class ReplayBuffer:
         # Convert to tensor
         states = torch.tensor(states, dtype=torch.float32, device=self.device)
         actions = torch.tensor(actions, dtype=torch.int64, device=self.device)
-        next_states = torch.tensor(next_states, dtype=torch.float32, device=self.device)
+        try:
+            next_states = torch.tensor(next_states, dtype=torch.float32, device=self.device)
+        except TypeError as e:
+            print(next_states)
+            exit(-1)
         rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
         dones = torch.tensor(dones, dtype=torch.bool, device=self.device)
 

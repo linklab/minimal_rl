@@ -94,7 +94,6 @@ class DQN():
 
         # init rewards
         self.episode_reward_lst = []
-        self.best_test_mean_episode_reward = -1000000000
 
         self.time_steps = 0
         self.training_time_steps = 0

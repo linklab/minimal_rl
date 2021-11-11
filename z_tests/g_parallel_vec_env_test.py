@@ -67,7 +67,7 @@ class Learner(Process):
 
             if parallel_vectorized_transitions is None:
                 self.n_actor_terminations += 1
-                if self.n_actor_terminations == self.n_actors:
+                if self.n_actor_terminations >= self.n_actors:
                     break
                 else:
                     continue
@@ -145,9 +145,9 @@ def main():
     for actor in actors:
         actor.start()
 
-    for actor in actors:
-        while not actor.is_vectorized_env_created.value:
-            time.sleep(0.1)
+    # for actor in actors: # Busy Wait
+    #     while not actor.is_vectorized_env_created.value:
+    #         time.sleep(0.1)
 
     learner.start()
 

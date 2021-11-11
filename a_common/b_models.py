@@ -173,10 +173,10 @@ class ActorCritic(nn.Module):
         x = F.relu(self.fc2(x))
         return x
 
-    def pi(self, x, softmax_dim=1):
+    def pi(self, x):
         x = self.forward(x)
         x = self.fc_pi(x)
-        prob = F.softmax(x, dim=softmax_dim)
+        prob = F.softmax(x, dim=1 if x.dim() == 2 else 0)
         return prob
 
     def v(self, x):

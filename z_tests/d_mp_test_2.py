@@ -12,11 +12,8 @@ def proc_b(queue):
 
 
 if __name__ == '__main__':
-    yyy = "hi"
-    print("%05s" % yyy)
-
-    b = [(1, 2), (20, 30), (200, 300)]
-    print(list(zip(*b)))
+    # b = [(1, 2), (20, 30), (200, 300)]
+    # print(list(zip(*b)))
 
     queue = SimpleQueue()
     p1 = Process(target=proc_a, args=(queue,))
@@ -24,7 +21,9 @@ if __name__ == '__main__':
 
     p1.start()
     p2.start()
+
     p1.join()
+
     p2.join()
 
 
