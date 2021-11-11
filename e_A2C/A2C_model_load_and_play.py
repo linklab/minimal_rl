@@ -58,7 +58,7 @@ def play(env, pi, num_episodes):
         ))
 
 
-def main_reinforce_play(num_episodes):
+def main_a2c_play(num_episodes):
     env = gym.make(ENV_NAME)
 
     pi = Policy()
@@ -73,4 +73,4 @@ def main_reinforce_play(num_episodes):
 
 if __name__ == "__main__":
     NUM_EPISODES = 5
-    main_reinforce_play(num_episodes=NUM_EPISODES)
+    main_a2c_play(num_episodes=NUM_EPISODES)
