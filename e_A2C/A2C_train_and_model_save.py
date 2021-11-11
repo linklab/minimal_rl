@@ -2,79 +2,76 @@ import sys
 import os
 import time
 
-from torch.distributions import Categorical
-
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-
 import gym
 import numpy as np
 import torch
-import torch.nn.functional as F
 import torch.optim as optim
-import torch.nn as nn
+import torch.nn.functional as F
 
 import wandb
+from gym.vector import AsyncVectorEnv
 
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
-
 
 CURRENT_PATH = os.path.dirname(os.path.realpath(__file__))
 PROJECT_HOME = os.path.abspath(os.path.join(CURRENT_PATH, os.pardir))
 if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
 
-MODEL_DIR = os.path.join(PROJECT_HOME, "d_REINFORCE", "models")
+from a_common.a_commons import make_cart_pole_env, VectorizedTransitions
+from a_common.b_models import ActorCritic
+from a_common.c_buffers import ReplayBufferForVectorizedEnvs
+
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+
+MODEL_DIR = os.path.join(PROJECT_HOME, "e_A2C", "models")
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
 
-
-class Policy(nn.Module):
-    def __init__(self):
-        super(Policy, self).__init__()
-        self.fc1 = nn.Linear(4, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, 2)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = F.softmax(self.fc3(x), dim=0)
-        return x
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class A2C:
     def __init__(
-            self, env_name, env, test_env, use_wandb, wandb_entity,
-            max_num_episodes, learning_rate, gamma,
-            print_episode_interval,
-            test_episode_interval, test_num_episodes,
+            self, env_name, n_envs, env, test_env, use_wandb, wandb_entity,
+            max_num_time_steps, learning_rate, gamma, batch_size,
+            print_time_step_interval,
+            test_training_time_step_interval, test_num_episodes,
             episode_reward_avg_solved, episode_reward_std_solved
     ):
         self.env_name = env_name
+        self.n_envs = n_envs
         self.use_wandb = use_wandb
         if self.use_wandb:
             self.wandb = wandb.init(
                 entity=wandb_entity,
                 project="A2C_{0}".format(self.env_name)
             )
-        self.max_num_episodes = max_num_episodes
+        self.max_num_time_steps = max_num_time_steps
         self.gamma = gamma
-        self.print_episode_interval = print_episode_interval
-        self.test_episode_interval = test_episode_interval
+        self.batch_size = batch_size
+        self.print_time_step_interval = print_time_step_interval
+        self.test_training_time_step_interval = test_training_time_step_interval
         self.test_num_episodes = test_num_episodes
         self.episode_reward_avg_solved = episode_reward_avg_solved
         self.episode_reward_std_solved = episode_reward_std_solved
 
-        #env
+        # env
         self.env = env
         self.test_env = test_env
 
-        self.data = []
+        self.buffer_for_vectorized_envs = ReplayBufferForVectorizedEnvs(
+            capacity=batch_size
+        )
 
-        self.pi = Policy()
-        self.optimizer = optim.Adam(self.pi.parameters(), lr=learning_rate)
+        self.actor_critic_model = ActorCritic(
+            n_features=4, n_actions=2, device=DEVICE
+        )
+        self.optimizer = optim.Adam(
+            self.actor_critic_model.parameters(), lr=learning_rate
+        )
 
         # init rewards
         self.episode_reward_lst = []
@@ -82,92 +79,74 @@ class A2C:
         self.time_steps = 0
         self.training_time_steps = 0
 
-    def train_net(self):
-        R = 0
-        loss = 0.0
-
-        self.optimizer.zero_grad()
-        for r, prob in self.data[::-1]:
-            R = r + self.gamma * R
-            loss = -torch.log(prob) * R
-            loss.backward()
-        self.optimizer.step()
-        self.data = []
-
-        return loss.item()
-
-    def get_action(self, observation):
-        action_prob = self.pi(torch.from_numpy(observation).float())
-        m = Categorical(action_prob)
-        action = m.sample()
-        return action_prob, action.item()
+        self.next_test_training_time_step = self.test_training_time_step_interval
 
     def train_loop(self):
+        episode_rewards = np.zeros((self.n_envs,))
         total_train_start_time = time.time()
+
+        test_episode_reward_avg = 0.0
+        test_episode_reward_std = 0.0
 
         is_terminated = False
 
-        for n_episode in range(self.max_num_episodes):
-            episode_start_time = time.time()
-            episode_reward = 0
+        observations = self.env.reset()
+        n_episode = 0
+        mean_episode_reward = 0.0
 
-            # Environment 초기화와 변수 초기화
-            observation = self.env.reset()
+        actor_objective = 0.0
+        critic_loss = 0.0
 
-            while True:
-                self.time_steps += 1
-                action_prob, action = self.get_action(observation)
+        while self.time_steps < self.max_num_time_steps:
+            actions = self.actor_critic_model.get_action(observations)
+            next_observations, rewards, dones, infos = self.env.step(actions)
+            self.time_steps += self.n_envs
 
-                next_observation, reward, done, _ = self.env.step(action)
+            vectorized_transitions = VectorizedTransitions(
+                observations, actions, next_observations, rewards, dones
+            )
+            self.buffer_for_vectorized_envs.append(vectorized_transitions)
 
-                self.data.append((reward, action_prob[action]))
-                observation = next_observation
-                episode_reward += reward
-
-                if done:
-                    break
+            observations = next_observations
+            episode_rewards += rewards
 
             # TRAIN
-            loss = self.train_net()
-            self.training_time_steps = n_episode
+            if len(self.buffer_for_vectorized_envs) >= self.batch_size:
+                actor_objective, critic_loss = self.train_step()
 
-            self.episode_reward_lst.append(episode_reward)
+            if any(dones):
+                self.episode_reward_lst.extend([episode_reward for episode_reward in episode_rewards[dones]])
+                episode_rewards[dones] = 0.0
+                mean_episode_reward = np.mean(self.episode_reward_lst[-100:])
+                n_episode += sum(dones)
 
-            per_episode_time = time.time() - episode_start_time
-            per_episode_time = time.strftime('%H:%M:%S', time.gmtime(per_episode_time))
-
-            mean_episode_reward = np.mean(self.episode_reward_lst[-100:])
-
-            total_training_time = time.time() - total_train_start_time
-            total_training_time = time.strftime(
-                '%H:%M:%S', time.gmtime(total_training_time)
-            )
-
-            if n_episode % self.print_episode_interval == 0:
-                print(
-                    "[Episode {:3}, Steps {:6}]".format(
-                        n_episode, self.time_steps
-                    ),
-                    "Episode Reward: {:>5},".format(episode_reward),
-                    "Mean Episode Reward: {:.3f},".format(mean_episode_reward),
-                    "Loss: {:.3f},".format(loss),
-                    "Per-Episode Time: {}".format(per_episode_time),
-                    "Total Elapsed Time {}".format(total_training_time)
-                )
-
-            if self.training_time_steps > 0 and n_episode % self.test_episode_interval == 0:
-                test_episode_reward_avg, test_episode_reward_std = self.reinforce_testing(
+            if self.training_time_steps >= self.next_test_training_time_step:
+                test_episode_reward_avg, test_episode_reward_std = self.a2c_testing(
                     self.test_num_episodes
                 )
 
-                print("[Test Episode Reward] Average: {0:.3f}, Standard Dev.: {1:.3f}".format(
-                    test_episode_reward_avg, test_episode_reward_std
+                print("[Test Episode Reward (Training Time Steps: {0:3})] "
+                      "Average: {1:7.3f}, Standard Dev.: {2:.3f}".format(
+                    self.training_time_steps,
+                    test_episode_reward_avg,
+                    test_episode_reward_std
                 ))
 
                 termination_conditions = [
                     test_episode_reward_avg > self.episode_reward_avg_solved,
                     test_episode_reward_std < self.episode_reward_std_solved
                 ]
+
+                if self.use_wandb:
+                    self.wandb.log({
+                        "[TEST] Average Episode Reward": test_episode_reward_avg,
+                        "[TEST] Std. Episode Reward": test_episode_reward_std,
+                        "Episode": n_episode,
+                        "Actor Objective": actor_objective if actor_objective != 0.0 else 0.0,
+                        "Critic Loss": critic_loss if critic_loss != 0.0 else 0.0,
+                        "Mean Episode Reward": mean_episode_reward,
+                        "Number of Training Steps": self.training_time_steps,
+                    })
 
                 if all(termination_conditions):
                     print("Solved in {0} steps ({1} training steps)!".format(
@@ -178,21 +157,107 @@ class A2C:
                     )
                     is_terminated = True
 
+                self.next_test_training_time_step += self.test_training_time_step_interval
+
+            total_training_time = time.time() - total_train_start_time
+            total_training_time = time.strftime(
+                '%H:%M:%S', time.gmtime(total_training_time)
+            )
+
+            if self.time_steps % self.print_time_step_interval == 0:
+                print(
+                    "[Episode {:3}, Steps {:6}, Training Steps {:6}]".format(
+                        n_episode + 1, self.time_steps, self.training_time_steps
+                    ),
+                    "Mean Episode Reward: {:.3f},".format(mean_episode_reward),
+                    "Actor Objective: {:.3f},".format(actor_objective),
+                    "Critic Loss: {:.3f},".format(critic_loss),
+                    "Total Elapsed Time {}".format(total_training_time)
+                )
+
             if is_terminated:
                 break
 
+        total_training_time = time.time() - total_train_start_time
+        total_training_time = time.strftime('%H:%M:%S', time.gmtime(total_training_time))
+        print("Total Training End : {}".format(total_training_time))
+
+    def train_step(self):
+        self.training_time_steps += 1
+
+        batch = self.buffer_for_vectorized_envs.sample_all()
+
+        observations, actions, next_observations, rewards, dones = batch
+
+        self.optimizer.zero_grad()
+
+        ###################################
+        #  Critic (Value) 손실 산출 - BEGIN #
+        ###################################
+        # next_values.shape: (32, 1)
+        next_values = self.actor_critic_model.v(next_observations)
+        td_target_value_lst = list()
+
+        for reward, next_value, done in zip(rewards, next_values, dones):
+            td_target = reward + self.gamma * next_value * (0.0 if done else 1.0)
+            td_target_value_lst.append(td_target)
+
+        # td_target_values.shape: (32, 1)
+        td_target_values = torch.tensor(
+            td_target_value_lst, dtype=torch.float32
+        ).unsqueeze(dim=-1)
+
+        # values.shape: (32, 1)
+        values = self.actor_critic_model.v(observations)
+        # loss_critic.shape: (,) <--  값 1개
+        critic_loss = F.mse_loss(td_target_values.detach(), values)
+        ###################################
+        #  Critic (Value)  Loss 산출 - END #
+        ###################################
+
+        ################################
+        #  Actor Objective 산출 - BEGIN #
+        ################################
+        q_values = td_target_values
+        advantages = (q_values - values).detach()
+
+        action_probs = self.actor_critic_model.pi(observations)
+        # print(action_probs.shape, actions.unsqueeze(-1).shape, "!!!!!!!!!1")
+        action_prob_selected = action_probs.gather(dim=1, index=actions.unsqueeze(-1))
+
+        # action_prob_selected.shape: (32,)
+        # advantage.shape: (32,)
+        # actor_objectives.shape: (32,)
+        log_pi_advantages = torch.multiply(
+            torch.log(action_prob_selected), advantages
+        )
+
+        # actor_objective.shape: (,) <--  값 1개
+        actor_objective = torch.sum(log_pi_advantages)
+
+        actor_loss = torch.multiply(actor_objective, -1.0)
+        ##############################
+        #  Actor Objective 산출 - END #
+        ##############################
+
+        loss = critic_loss * 0.5 + actor_loss
+
+        loss.backward()
+        self.optimizer.step()
+
+        self.buffer_for_vectorized_envs.clear()
+
+        return actor_objective.item(), critic_loss.item()
+
     def model_save(self, test_episode_reward_avg, test_episode_reward_std):
-        print("Solved in {0} steps ({1} training steps)!".format(
-            self.time_steps, self.training_time_steps
-        ))
         torch.save(
-            self.pi.state_dict(),
-            os.path.join(MODEL_DIR, "reinforce_{0}_{1:4.1f}_{2:3.1f}.pth".format(
+            self.actor_critic_model.state_dict(),
+            os.path.join(MODEL_DIR, "a2c_{0}_{1:4.1f}_{2:3.1f}.pth".format(
                 self.env_name, test_episode_reward_avg, test_episode_reward_std
             ))
         )
 
-    def reinforce_testing(self, num_episodes):
+    def a2c_testing(self, num_episodes):
         episode_reward_lst = []
 
         for i in range(num_episodes):
@@ -202,7 +267,7 @@ class A2C:
             observation = self.test_env.reset()
 
             while True:
-                _, action = self.get_action(observation)
+                action = self.actor_critic_model.get_action(observation, mode="test")
 
                 next_observation, reward, done, _ = self.test_env.step(action)
 
@@ -221,25 +286,28 @@ def main():
     ENV_NAME = "CartPole-v1"
 
     # env
-    env = gym.make(ENV_NAME)
+    n_envs = 2
+    env = AsyncVectorEnv(env_fns=[make_cart_pole_env for _ in range(n_envs)])
     test_env = gym.make(ENV_NAME)
 
-    reinforce = A2C(
+    a2c = A2C(
         env_name=ENV_NAME,
+        n_envs=n_envs,
         env=env,
         test_env=test_env,
-        use_wandb=False,                            # WANDB 연결 및 로깅 유무
+        use_wandb=True,                         # WANDB 연결 및 로깅 유무
         wandb_entity="link-koreatech",          # WANDB 개인 계정
-        max_num_episodes=None,                  # 훈련을 위한 최대 에피소드 횟수
-        learning_rate=None,                     # 학습율
-        gamma=None,                             # 감가율
-        print_episode_interval=None,            # Episode 통계 출력에 관한 에피소드 간격
-        test_episode_interval=None,             # 테스트를 위한 episode 간격
-        test_num_episodes=None,                 # 테스트시에 수행하는 에피소드 횟수
+        max_num_time_steps=1_000_000,           # 훈련을 위한 최대 타임 스텝 수
+        learning_rate=0.0002,                   # 학습율
+        gamma=0.99,                             # 감가율
+        batch_size=64,                         # 훈련시 버퍼에서 한번에 가져오는 랜덤 배치 사이즈
+        print_time_step_interval=500,           # 통계 출력에 관한 time_step 간격
+        test_training_time_step_interval=100,   # 테스트를 위한 training_time_step 간격
+        test_num_episodes=3,                    # 테스트시에 수행하는 에피소드 횟수
         episode_reward_avg_solved=450,          # 훈련 종료를 위한 테스트 에피소드 리워드의 Average
         episode_reward_std_solved=10            # 훈련 종료를 위한 테스트 에피소드 리워드의 Standard Deviation
     )
-    reinforce.train_loop()
+    a2c.train_loop()
 
 
 if __name__ == '__main__':

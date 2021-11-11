@@ -132,7 +132,7 @@ class REINFORCE:
                 '%H:%M:%S', time.gmtime(total_training_time)
             )
 
-            if n_episode % self.print_episode_interval == 0:
+            if (n_episode + 1) % self.print_episode_interval == 0:
                 print(
                     "[Episode {:3}, Steps {:6}, Training Steps {:6}]".format(
                         n_episode + 1, self.time_steps, self.training_time_steps
@@ -203,9 +203,6 @@ class REINFORCE:
         return G
 
     def model_save(self, test_episode_reward_avg, test_episode_reward_std):
-        print("Solved in {0} steps ({1} training steps)!".format(
-            self.time_steps, self.training_time_steps
-        ))
         torch.save(
             self.policy.state_dict(),
             os.path.join(MODEL_DIR, "reinforce_{0}_{1:4.1f}_{2:3.1f}.pth".format(

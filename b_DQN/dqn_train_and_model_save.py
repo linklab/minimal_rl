@@ -185,7 +185,7 @@ class DQN():
                             )
                             is_terminated = True
 
-                    if n_episode % self.print_episode_interval == 0:
+                    if (n_episode + 1) % self.print_episode_interval == 0:
                         print(
                             "[Episode {:3}, Steps {:6}]".format(
                                 n_episode + 1, self.time_steps
@@ -269,9 +269,6 @@ class DQN():
         return loss.item()
 
     def model_save(self, test_episode_reward_avg, test_episode_reward_std):
-        print("Solved in {0} steps ({1} training steps)!".format(
-            self.time_steps, self.training_time_steps
-        ))
         torch.save(
             self.q.state_dict(),
             os.path.join(MODEL_DIR, "dqn_{0}_{1:4.1f}_{2:3.1f}.pth".format(

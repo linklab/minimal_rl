@@ -47,11 +47,8 @@ class ReplayBuffer:
         # Convert to tensor
         states = torch.tensor(states, dtype=torch.float32, device=self.device)
         actions = torch.tensor(actions, dtype=torch.int64, device=self.device)
-        try:
-            next_states = torch.tensor(next_states, dtype=torch.float32, device=self.device)
-        except TypeError as e:
-            print(next_states)
-            exit(-1)
+        next_states = torch.tensor(next_states, dtype=torch.float32, device=self.device)
+
         rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
         dones = torch.tensor(dones, dtype=torch.bool, device=self.device)
 
@@ -63,8 +60,8 @@ class ReplayBufferForVectorizedEnvs(ReplayBuffer):
         for observation, action, next_observation, reward, done in zip(
                 *vectorized_transitions
         ):
-            if done:
-                next_observation = None
+            # if done:
+            #     next_observation = None
 
             transition = Transition(
                 observation, action, next_observation, reward, done
@@ -84,8 +81,8 @@ class ReplayBufferForParallelVectorizedEnvs(ReplayBuffer):
                 parallel_vectorized_transitions.rewards,
                 parallel_vectorized_transitions.dones
         ):
-            if done:
-                next_observation = None
+            # if done:
+            #     next_observation = None
 
             transition = Transition(
                 observation, action, next_observation, reward, done

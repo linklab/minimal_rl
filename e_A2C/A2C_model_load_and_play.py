@@ -12,11 +12,11 @@ PROJECT_HOME = os.path.abspath(os.path.join(CURRENT_PATH, os.pardir))
 if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
 
-from d_REINFORCE.REINFORCE_train_and_model_save import Policy
+from a_common.b_models import ActorCritic
 
 ENV_NAME = "CartPole-v1"
 
-MODEL_DIR = os.path.join(PROJECT_HOME, "d_REINFORCE", "models")
+MODEL_DIR = os.path.join(PROJECT_HOME, "e_A2C", "models")
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -28,7 +28,7 @@ def get_action(pi, observation):
     return action_prob, action.item()
 
 
-def play(env, pi, num_episodes):
+def play(env, actor_critic_model, num_episodes):
     for i in range(num_episodes):
         episode_reward = 0  # cumulative_reward
 
@@ -40,7 +40,7 @@ def play(env, pi, num_episodes):
 
         while True:
             episode_steps += 1
-            _, action = get_action(pi, observation)
+            action = actor_critic_model.get_action(observation, mode="test")
 
             # action을 통해서 next_state, reward, done, info를 받아온다
             next_observation, reward, done, _ = env.step(action)
@@ -61,12 +61,14 @@ def play(env, pi, num_episodes):
 def main_a2c_play(num_episodes):
     env = gym.make(ENV_NAME)
 
-    pi = Policy()
-    model_params = torch.load(
-        os.path.join(MODEL_DIR, "reinforce_CartPole-v1_500.0_0.0.pth")
+    actor_critic_model = ActorCritic(
+        n_features=4, n_actions=2, device=DEVICE
     )
-    pi.load_state_dict(model_params)
-    play(env, pi, num_episodes=num_episodes)
+    model_params = torch.load(
+        os.path.join(MODEL_DIR, "a2c_CartPole-v1_500.0_0.0.pth")
+    )
+    actor_critic_model.load_state_dict(model_params)
+    play(env, actor_critic_model, num_episodes=num_episodes)
 
     env.close()
 
