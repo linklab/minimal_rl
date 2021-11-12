@@ -18,9 +18,6 @@ from a_common.c_buffers import ReplayBuffer
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-# local
-ENV_NAME = "PongNoFrameskip-v4"
-
 MODEL_DIR = os.path.join(PROJECT_HOME, "c_DQN_ATARI", "models")
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
@@ -28,9 +25,9 @@ if not os.path.exists(MODEL_DIR):
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class DQN():
+class DQN:
     def __init__(
-            self, use_wandb, wandb_entity,
+            self, env_name, env, test_env, use_wandb, wandb_entity,
             max_num_episodes, batch_size, learning_rate,
             gamma, target_sync_step_interval,
             replay_buffer_size, min_buffer_size_for_training,
@@ -40,11 +37,12 @@ class DQN():
             test_episode_interval, test_num_episodes,
             episode_reward_avg_solved, episode_reward_std_solved
     ):
+        self.env_name = env_name
         self.use_wandb = use_wandb
         if self.use_wandb:
             self.wandb = wandb.init(
                 entity=wandb_entity,
-                project="DQN_PONG"
+                project="DQN_{0}".format(self.env_name)
             )
         self.max_num_episodes = max_num_episodes
         self.batch_size = batch_size
@@ -62,27 +60,11 @@ class DQN():
         self.episode_reward_avg_solved = episode_reward_avg_solved
         self.episode_reward_std_solved = episode_reward_std_solved
 
-        # env
-        self.env = gym.make(ENV_NAME)
-        self.env = gym.wrappers.AtariPreprocessing(
-            self.env, grayscale_obs=True, scale_obs=True
-        )
-        self.env = gym.wrappers.FrameStack(
-            self.env, num_stack=4, lz4_compress=True
-        )
-
-        # test_env
-        self.test_env = gym.make(ENV_NAME)
-        self.test_env = gym.wrappers.AtariPreprocessing(
-            self.test_env, grayscale_obs=True, scale_obs=True
-        )
-        self.test_env = gym.wrappers.FrameStack(self.test_env, num_stack=4, lz4_compress=True)
-
-        # self.env = make_sleepy_toy_env(self.env_name)
+        self.env = env
+        self.test_env = test_env
 
         obs_shape = self.env.observation_space.shape
-        #n_actions = self.env.action_space.n
-        n_actions = 3
+        n_actions = self.env.action_space.n
 
         # network
         self.q = AtariCNN(obs_shape, n_actions).to(DEVICE)
@@ -129,10 +111,10 @@ class DQN():
             while True:
                 self.time_steps += 1
 
-                action, gym_action = self.q.get_action(observation, epsilon)
+                action = self.q.get_action(observation, epsilon)
 
                 # do step in the environment
-                next_observation, reward, done, _ = self.env.step(gym_action)
+                next_observation, reward, done, _ = self.env.step(action)
 
                 transition = Transition(
                     observation, action, next_observation, reward, done
@@ -226,28 +208,33 @@ class DQN():
         batch = self.replay_buffer.sample(self.batch_size)
 
         # observations.shape: torch.Size([32, 4, 84, 84]),
-        # actions.shape: torch.Size([32]),
+        # actions.shape: torch.Size([32, 1]),
         # next_observations.shape: torch.Size([32, 4, 84, 84]),
-        # rewards.shape: torch.Size([32]),
+        # rewards.shape: torch.Size([32, 1]),
         # dones.shape: torch.Size([32])
         observations, actions, next_observations, rewards, dones = batch
 
-        # state_action_values.shape: torch.Size([32])
+        # state_action_values.shape: torch.Size([32, 1])
         state_action_values = self.q(observations).gather(1, actions)
 
         with torch.no_grad():
-            # next_state_values.shape: torch.Size([32])
-            next_state_values = self.target_q(next_observations).max(dim=1).values
+            # next_state_values.shape: torch.Size([32, 1])
+            next_state_values = self.target_q(next_observations).max(
+                dim=1, keepdim=True
+            ).values
             next_state_values[dones] = 0.0
             next_state_values = next_state_values.detach()
 
-            # target_state_action_values.shape: torch.Size([32])
+            # target_state_action_values.shape: torch.Size([32, 1])
             target_state_action_values = rewards + self.gamma * next_state_values
 
+        # loss is just scalar torch value
         loss = F.mse_loss(state_action_values, target_state_action_values)
 
-        # print("observations.shape: {0}, actions.shape: {1}, next_observations.shape: {2}, rewards.shape: {3}, dones.shape: {4}".format(
-        #     observations.shape, actions.shape, next_observations.shape, rewards.shape, dones.shape
+        # print("observations.shape: {0}, actions.shape: {1}, "
+        #       "next_observations.shape: {2}, rewards.shape: {3}, dones.shape: {4}".format(
+        #     observations.shape, actions.shape,
+        #     next_observations.shape, rewards.shape, dones.shape
         # ))
         # print("state_action_values.shape: {0}".format(state_action_values.shape))
         # print("next_state_values.shape: {0}".format(next_state_values.shape))
@@ -269,7 +256,7 @@ class DQN():
         torch.save(
             self.q.state_dict(),
             os.path.join(MODEL_DIR, "dqn_{0}_{1:4.1f}_{2:3.1f}.pth".format(
-                ENV_NAME, test_episode_reward_avg, test_episode_reward_std
+                self.env_name, test_episode_reward_avg, test_episode_reward_std
             ))
         )
 
@@ -300,39 +287,43 @@ class DQN():
 
 
 def main():
+    # local
     ENV_NAME = "PongNoFrameskip-v4"
 
     # env
     env = gym.make(ENV_NAME)
-    env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=True)
+    env = gym.wrappers.AtariPreprocessing(
+        env, grayscale_obs=True, scale_obs=True
+    )
     env = gym.wrappers.FrameStack(env, num_stack=4, lz4_compress=True)
 
     # test_env
     test_env = gym.make(ENV_NAME)
-    test_env = gym.wrappers.AtariPreprocessing(test_env, grayscale_obs=True, scale_obs=True
+    test_env = gym.wrappers.AtariPreprocessing(
+        test_env, grayscale_obs=True, scale_obs=True
     )
     test_env = gym.wrappers.FrameStack(test_env, num_stack=4, lz4_compress=True)
 
     dqn = DQN(
         env_name=ENV_NAME,
-        use_wandb=True,                         # WANDB 연결 및 로깅 유무
-        wandb_entity="link-koreatech",          # WANDB 개인 계정
         env=env,
         test_env=test_env,
-        max_num_episodes=None,                  # 훈련을 위한 최대 에피소드 횟수
-        batch_size=None,                        # 훈련시 배치에서 한번에 가져오는 랜덤 배치 사이즈
-        learning_rate=None,                     # 학습율
-        gamma=None,                             # 감가율
-        target_sync_step_interval=None,         # 기존 Q 모델을 타깃 Q 모델로 동기화시키는 step 간격
-        replay_buffer_size=None,                # 리플레이 버퍼 사이즈
-        min_buffer_size_for_training=None,      # 훈련을 위한 최소 리플레이 버퍼 사이즈
-        epsilon_start=None,                     # Epsilon 초기 값
-        epsilon_end=None,                       # Epsilon 최종 값
-        epsilon_scheduled_last_episode=None,    # Epsilon 최종 값으로 스케줄되어지는 마지막 에피소드
+        use_wandb=False,                        # WANDB 연결 및 로깅 유무
+        wandb_entity="link-koreatech",          # WANDB 개인 계정
+        max_num_episodes=1_000,                 # 훈련을 위한 최대 에피소드 횟수
+        batch_size=32,                          # 훈련시 배치에서 한번에 가져오는 랜덤 배치 사이즈
+        learning_rate=0.0001,                   # 학습율
+        gamma=0.99,                             # 감가율
+        target_sync_step_interval=1_000,        # 기존 Q 모델을 타깃 Q 모델로 동기화시키는 step 간격
+        replay_buffer_size=100_000,             # 리플레이 버퍼 사이즈
+        min_buffer_size_for_training=10_000,    # 훈련을 위한 최소 리플레이 버퍼 사이즈
+        epsilon_start=1.0,                      # Epsilon 초기 값
+        epsilon_end=0.01,                       # Epsilon 최종 값
+        epsilon_scheduled_last_episode=300,     # Epsilon 최종 값으로 스케줄되어지는 마지막 에피소드
         print_episode_interval=1,               # Episode 통계 출력에 관한 에피소드 간격
-        test_episode_interval=None,             # 테스트를 위한 training_step 간격
-        test_num_episodes=None,                 # 테스트시에 수행하는 에피소드 횟수
-        episode_reward_avg_solved=0,            # 훈련 종료를 위한 테스트 에피소드 리워드의 Average
+        test_episode_interval=5,                # 테스트를 위한 episode 간격
+        test_num_episodes=3,                    # 테스트시에 수행하는 에피소드 횟수
+        episode_reward_avg_solved=3,            # 훈련 종료를 위한 테스트 에피소드 리워드의 Average
         episode_reward_std_solved=3             # 훈련 종료를 위한 테스트 에피소드 리워드의 Standard Deviation
     )
     dqn.train_loop()
