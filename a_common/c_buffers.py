@@ -35,24 +35,30 @@ class ReplayBuffer:
         indices = np.random.choice(len(self.buffer), size=batch_size, replace=False)
 
         # Sample
-        states, actions, next_states, rewards, dones = zip(*[self.buffer[idx] for idx in indices])
+        observations, actions, next_observations, rewards, dones = zip(*[self.buffer[idx] for idx in indices])
 
         # Convert to ndarray for speed up cuda
-        states = np.array(states)
+        observations = np.array(observations)
+        next_observations = np.array(next_observations)
+        # observations.shape, next_observations.shape: (64, 4), (64, 4)
+
         actions = np.array(actions)
-        next_states = np.array(next_states)
-        rewards = np.array(rewards, dtype=np.float32)
+        actions = np.expand_dims(actions, axis=-1) if actions.ndim == 1 else actions
+
+        rewards = np.array(rewards)
+        rewards = np.expand_dims(rewards, axis=-1) if rewards.ndim == 1 else rewards
+
         dones = np.array(dones, dtype=bool)
+        # actions.shape, rewards.shape, dones.shape: (64, 1) (64, 1) (64,)
 
         # Convert to tensor
-        states = torch.tensor(states, dtype=torch.float32, device=self.device)
+        observations = torch.tensor(observations, dtype=torch.float32, device=self.device)
         actions = torch.tensor(actions, dtype=torch.int64, device=self.device)
-        next_states = torch.tensor(next_states, dtype=torch.float32, device=self.device)
-
+        next_observations = torch.tensor(next_observations, dtype=torch.float32, device=self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
         dones = torch.tensor(dones, dtype=torch.bool, device=self.device)
 
-        return states, actions, next_states, rewards, dones
+        return observations, actions, next_observations, rewards, dones
 
 
 class ReplayBufferForVectorizedEnvs(ReplayBuffer):

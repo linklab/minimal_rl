@@ -187,9 +187,9 @@ class ActorCritic(nn.Module):
     def get_action(self, x, mode="train"):
         action_prob = self.pi(x)
         m = Categorical(probs=action_prob)
-
         if mode == "train":
             action = m.sample()
         else:
             action = torch.argmax(m.probs, dim=1 if action_prob.dim() == 2 else 0)
         return action.numpy()
+

@@ -96,11 +96,6 @@ class DQN():
         else:
             # Convert to Tensor
             observation = torch.tensor(observation, dtype=torch.float32, device=DEVICE)
-
-            # Add batch-dim
-            if len(observation.shape) == 3:
-                observation = observation.unsqueeze(dim=0)
-
             q_values = self.q(observation)
             action = torch.argmax(q_values, dim=-1)
             action = int(action.item())
@@ -228,19 +223,19 @@ class DQN():
 
         batch = self.replay_buffer.sample(self.batch_size)
 
-        # states.shape: torch.Size([32, 4, 84, 84]),
+        # observations.shape: torch.Size([32, 4, 84, 84]),
         # actions.shape: torch.Size([32]),
-        # next_states.shape: torch.Size([32, 4, 84, 84]),
+        # next_observations.shape: torch.Size([32, 4, 84, 84]),
         # rewards.shape: torch.Size([32]),
         # dones.shape: torch.Size([32])
-        states, actions, next_states, rewards, dones = batch
+        observations, actions, next_observations, rewards, dones = batch
 
         # state_action_values.shape: torch.Size([32])
-        state_action_values = self.q(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
+        state_action_values = self.q(observations).gather(dim=1, index=actions)
 
         with torch.no_grad():
             # next_state_values.shape: torch.Size([32])
-            next_state_values = self.target_q(next_states).max(dim=1).values
+            next_state_values = self.target_q(next_observations).max(dim=1).values
             next_state_values[dones] = 0.0
             next_state_values = next_state_values.detach()
 
@@ -249,8 +244,8 @@ class DQN():
 
         loss = F.mse_loss(state_action_values, target_state_action_values)
 
-        # print("states.shape: {0}, actions.shape: {1}, next_states.shape: {2}, rewards.shape: {3}, dones.shape: {4}".format(
-        #     states.shape, actions.shape, next_states.shape, rewards.shape, dones.shape
+        # print("observations.shape: {0}, actions.shape: {1}, next_observations.shape: {2}, rewards.shape: {3}, dones.shape: {4}".format(
+        #     observations.shape, actions.shape, next_observations.shape, rewards.shape, dones.shape
         # ))
         # print("state_action_values.shape: {0}".format(state_action_values.shape))
         # print("next_state_values.shape: {0}".format(next_state_values.shape))
