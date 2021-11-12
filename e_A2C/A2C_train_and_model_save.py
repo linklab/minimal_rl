@@ -182,9 +182,9 @@ class A2C:
 
         batch = self.buffer_for_vectorized_envs.sample_all()
 
-        # observations.shape: torch.Size([32, 4, 84, 84]),
+        # observations.shape: torch.Size([32, 4]),
         # actions.shape: torch.Size([32, 1]),
-        # next_observations.shape: torch.Size([32, 4, 84, 84]),
+        # next_observations.shape: torch.Size([32, 4]),
         # rewards.shape: torch.Size([32, 1]),
         # dones.shape: torch.Size([32])
         observations, actions, next_observations, rewards, dones = batch
@@ -222,7 +222,6 @@ class A2C:
         advantages = (q_values - values).detach()
 
         action_probs = self.actor_critic_model.pi(observations)
-        # print(action_probs.shape, actions.unsqueeze(-1).shape, "!!!!!!!!!1")
         action_prob_selected = action_probs.gather(dim=1, index=actions)
 
         # action_prob_selected.shape: (32, 1)
@@ -234,7 +233,6 @@ class A2C:
 
         # actor_objective.shape: (,) <--  값 1개
         actor_objective = torch.sum(log_pi_advantages)
-
         actor_loss = torch.multiply(actor_objective, -1.0)
         ##############################
         #  Actor Objective 산출 - END #

@@ -66,9 +66,6 @@ class ReplayBufferForVectorizedEnvs(ReplayBuffer):
         for observation, action, next_observation, reward, done in zip(
                 *vectorized_transitions
         ):
-            # if done:
-            #     next_observation = None
-
             transition = Transition(
                 observation, action, next_observation, reward, done
             )
@@ -87,9 +84,6 @@ class ReplayBufferForParallelVectorizedEnvs(ReplayBuffer):
                 parallel_vectorized_transitions.rewards,
                 parallel_vectorized_transitions.dones
         ):
-            # if done:
-            #     next_observation = None
-
             transition = Transition(
                 observation, action, next_observation, reward, done
             )
