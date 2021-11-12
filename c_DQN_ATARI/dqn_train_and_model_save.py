@@ -270,10 +270,10 @@ class DQN:
             observation = self.test_env.reset()
 
             while True:
-                _, gym_action = self.q.get_action(observation, epsilon=0.0)
+                action = self.q.get_action(observation, epsilon=0.0)
 
                 # action을 통해서 next_state, reward, done, info를 받아온다
-                next_observation, reward, done, _ = self.test_env.step(gym_action)
+                next_observation, reward, done, _ = self.test_env.step(action)
 
                 episode_reward += reward  # episode_reward 를 산출하는 방법은 감가률 고려하지 않는 이 라인이 더 올바름.
                 observation = next_observation
@@ -308,7 +308,7 @@ def main():
         env_name=ENV_NAME,
         env=env,
         test_env=test_env,
-        use_wandb=True,                        # WANDB 연결 및 로깅 유무
+        use_wandb=False,                        # WANDB 연결 및 로깅 유무
         wandb_entity="link-koreatech",          # WANDB 개인 계정
         max_num_episodes=1_000,                 # 훈련을 위한 최대 에피소드 횟수
         batch_size=32,                          # 훈련시 배치에서 한번에 가져오는 랜덤 배치 사이즈
