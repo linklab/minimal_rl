@@ -35,14 +35,14 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class A2C:
     def __init__(
-            self, env_name, n_envs, env, test_env, use_wandb, wandb_entity,
+            self, env_name, n_vec_envs, env, test_env, use_wandb, wandb_entity,
             max_num_time_steps, learning_rate, gamma, batch_size,
             print_time_step_interval,
             test_training_time_step_interval, test_num_episodes,
             episode_reward_avg_solved, episode_reward_std_solved
     ):
         self.env_name = env_name
-        self.n_envs = n_envs
+        self.n_vec_envs = n_vec_envs
         self.use_wandb = use_wandb
         if self.use_wandb:
             self.wandb = wandb.init(
@@ -82,7 +82,7 @@ class A2C:
         self.next_test_training_time_step = self.test_training_time_step_interval
 
     def train_loop(self):
-        episode_rewards = np.zeros((self.n_envs,))
+        episode_rewards = np.zeros((self.n_vec_envs,))
         total_train_start_time = time.time()
 
         test_episode_reward_avg = 0.0
@@ -100,7 +100,7 @@ class A2C:
         while self.time_steps < self.max_num_time_steps:
             actions = self.actor_critic_model.get_action(observations)
             next_observations, rewards, dones, infos = self.env.step(actions)
-            self.time_steps += self.n_envs
+            self.time_steps += self.n_vec_envs
 
             vectorized_transitions = VectorizedTransitions(
                 observations, actions, next_observations, rewards, dones
@@ -286,13 +286,13 @@ def main():
     ENV_NAME = "CartPole-v1"
 
     # env
-    n_envs = 4
-    env = AsyncVectorEnv(env_fns=[make_cart_pole_env for _ in range(n_envs)])
+    n_vec_envs = 4
+    env = AsyncVectorEnv(env_fns=[make_cart_pole_env for _ in range(n_vec_envs)])
     test_env = gym.make(ENV_NAME)
 
     a2c = A2C(
         env_name=ENV_NAME,
-        n_envs=n_envs,
+        n_vec_envs=n_vec_envs,
         env=env,
         test_env=test_env,
         use_wandb=True,                         # WANDB 연결 및 로깅 유무

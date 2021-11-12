@@ -27,8 +27,6 @@ np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
 
-ENV_NAME = "CartPole-v1"
-
 MODEL_DIR = os.path.join(PROJECT_HOME, "b_DQN", "models")
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
@@ -38,7 +36,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class DQN():
     def __init__(
-            self, use_wandb, wandb_entity,
+            self, env_name, env, test_env, use_wandb, wandb_entity,
             max_num_episodes, batch_size, learning_rate,
             gamma, target_sync_step_interval,
             replay_buffer_size, min_buffer_size_for_training,
@@ -48,11 +46,12 @@ class DQN():
             test_episode_interval, test_num_episodes,
             episode_reward_avg_solved, episode_reward_std_solved
     ):
+        self.env_name = env_name
         self.use_wandb = use_wandb
         if self.use_wandb:
             self.wandb = wandb.init(
                 entity=wandb_entity,
-                project="DQN_CARTPOLE"
+                project="DQN_{0}".format(self.env_name)
             )
         self.max_num_episodes = max_num_episodes
         self.batch_size = batch_size
@@ -70,11 +69,8 @@ class DQN():
         self.episode_reward_avg_solved = episode_reward_avg_solved
         self.episode_reward_std_solved = episode_reward_std_solved
 
-        # env
-        self.env = gym.make(ENV_NAME)
-
-        # test_env
-        self.test_env = gym.make(ENV_NAME)
+        self.env = env
+        self.test_env = test_env
 
         # network
         self.q = QNet().to(DEVICE)
@@ -95,7 +91,6 @@ class DQN():
             action = random.randint(0, 1)
         else:
             # Convert to Tensor
-            observation = torch.tensor(observation, dtype=torch.float32, device=DEVICE)
             q_values = self.q(observation)
             action = torch.argmax(q_values, dim=-1)
             action = int(action.item())
@@ -182,17 +177,17 @@ class DQN():
 
                     if (n_episode + 1) % self.print_episode_interval == 0:
                         print(
-                            "[Episode {:3}, Steps {:6}]".format(
+                            "[Episode {:3}, Time Steps {:6}]".format(
                                 n_episode + 1, self.time_steps
                             ),
                             "Episode Reward: {:>5},".format(episode_reward),
                             "Mean Episode Reward: {:.3f},".format(mean_episode_reward),
-                            "size of replay buffer: {:>6}".format(
+                            "size of replay buffer: {:>6},".format(
                                 self.replay_buffer.size()
                             ),
-                            "Loss: {:.3f},".format(loss),
-                            "Epsilon: {:.2f},".format(epsilon),
-                            "Num Training Steps: {:4},".format(self.training_time_steps),
+                            "Loss: {:6.3f},".format(loss),
+                            "Epsilon: {:4.2f},".format(epsilon),
+                            "Num Training Steps: {:5},".format(self.training_time_steps),
                             "Total Elapsed Time {}".format(total_training_time)
                         )
 
@@ -223,35 +218,41 @@ class DQN():
 
         batch = self.replay_buffer.sample(self.batch_size)
 
-        # observations.shape: torch.Size([32, 4, 84, 84]),
-        # actions.shape: torch.Size([32]),
-        # next_observations.shape: torch.Size([32, 4, 84, 84]),
-        # rewards.shape: torch.Size([32]),
+        # observations.shape: torch.Size([32, 4]),
+        # actions.shape: torch.Size([32, 1]),
+        # next_observations.shape: torch.Size([32, 4]),
+        # rewards.shape: torch.Size([32, 1]),
         # dones.shape: torch.Size([32])
         observations, actions, next_observations, rewards, dones = batch
 
-        # state_action_values.shape: torch.Size([32])
+        # state_action_values.shape: torch.Size([32, 1])
         state_action_values = self.q(observations).gather(dim=1, index=actions)
 
         with torch.no_grad():
-            # next_state_values.shape: torch.Size([32])
-            next_state_values = self.target_q(next_observations).max(dim=1).values
+            # next_state_values.shape: torch.Size([32, 1])
+            next_state_values = self.target_q(next_observations).max(
+                dim=1, keepdim=True
+            ).values
             next_state_values[dones] = 0.0
             next_state_values = next_state_values.detach()
 
-            # target_state_action_values.shape: torch.Size([32])
+            # target_state_action_values.shape: torch.Size([32, 1])
             target_state_action_values = rewards + self.gamma * next_state_values
 
+        # loss is just scalar torch value
         loss = F.mse_loss(state_action_values, target_state_action_values)
 
-        # print("observations.shape: {0}, actions.shape: {1}, next_observations.shape: {2}, rewards.shape: {3}, dones.shape: {4}".format(
-        #     observations.shape, actions.shape, next_observations.shape, rewards.shape, dones.shape
+        # print("observations.shape: {0}, actions.shape: {1}, "
+        #       "next_observations.shape: {2}, rewards.shape: {3}, dones.shape: {4}".format(
+        #     observations.shape, actions.shape,
+        #     next_observations.shape, rewards.shape, dones.shape
         # ))
         # print("state_action_values.shape: {0}".format(state_action_values.shape))
         # print("next_state_values.shape: {0}".format(next_state_values.shape))
         # print("target_state_action_values.shape: {0}".format(
         #     target_state_action_values.shape
         # ))
+        # print("loss.shape: {0}".format(loss.shape))
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -267,7 +268,7 @@ class DQN():
         torch.save(
             self.q.state_dict(),
             os.path.join(MODEL_DIR, "dqn_{0}_{1:4.1f}_{2:3.1f}.pth".format(
-                ENV_NAME, test_episode_reward_avg, test_episode_reward_std
+                self.env_name, test_episode_reward_avg, test_episode_reward_std
             ))
         )
 
@@ -298,15 +299,23 @@ class DQN():
 
 
 def main():
+    ENV_NAME = "CartPole-v1"
+
+    env = gym.make(ENV_NAME)
+    test_env = gym.make(ENV_NAME)
+
     dqn = DQN(
+        env_name=ENV_NAME,
+        env=env,
+        test_env=test_env,
         use_wandb=False,                            # WANDB 연결 및 로깅 유무
         wandb_entity="link-koreatech",          # WANDB 개인 계정
-        max_num_episodes=1000,                  # 훈련을 위한 최대 에피소드 횟수
+        max_num_episodes=1_000,                 # 훈련을 위한 최대 에피소드 횟수
         batch_size=32,                          # 훈련시 배치에서 한번에 가져오는 랜덤 배치 사이즈
         learning_rate=0.0001,                   # 학습율
         gamma=0.99,                             # 감가율
         target_sync_step_interval=500,          # 기존 Q 모델을 타깃 Q 모델로 동기화시키는 step 간격
-        replay_buffer_size=5_000,               # 리플레이 버퍼 사이즈
+        replay_buffer_size=10_000,              # 리플레이 버퍼 사이즈
         min_buffer_size_for_training=100,       # 훈련을 위한 최소 리플레이 버퍼 사이즈
         epsilon_start=0.5,                      # Epsilon 초기 값
         epsilon_end=0.01,                       # Epsilon 최종 값

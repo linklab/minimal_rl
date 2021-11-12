@@ -3,14 +3,14 @@ import time
 import numpy as np
 from gym.vector import SyncVectorEnv, AsyncVectorEnv
 
-from a_common.a_commons import VectorizedTransitions, make_env
+from a_common.a_commons import VectorizedTransitions, make_sleepy_toy_env
 from a_common.b_models import Policy
 from a_common.c_buffers import ReplayBufferForVectorizedEnvs
 
 
 def rl_main():
-    n_envs = 60
-    env = AsyncVectorEnv(env_fns=[make_env for _ in range(n_envs)])
+    n_vec_envs = 60
+    env = AsyncVectorEnv(env_fns=[make_sleepy_toy_env for _ in range(n_vec_envs)])
     policy = Policy(n_features=4, n_actions=3)
 
     replay_buffer_for_vectorized_envs = ReplayBufferForVectorizedEnvs(
@@ -18,12 +18,12 @@ def rl_main():
     )
 
     time_steps = 10
-    episode_rewards = np.zeros((n_envs,))
+    episode_rewards = np.zeros((n_vec_envs,))
     episode_reward_lst = []
     num_train_steps = 0
 
     print("******************************************")
-    print("Total numbers of envs: {0}".format(n_envs))
+    print("Total numbers of envs: {0}".format(n_vec_envs))
     print("******************************************")
 
     total_train_start_time = time.time()

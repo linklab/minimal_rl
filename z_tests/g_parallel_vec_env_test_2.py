@@ -4,13 +4,13 @@ import numpy as np
 from gym.vector import AsyncVectorEnv
 from torch.multiprocessing import Process, cpu_count
 
-from a_common.a_commons import make_env, ParallelVectorizedTransitions
+from a_common.a_commons import make_sleepy_toy_env, ParallelVectorizedTransitions
 from a_common.b_models import Policy
 from a_common.c_buffers import ReplayBufferForParallelVectorizedEnvs
 
 
-def rollout(actor_id, n_envs, policy, queue, time_steps):
-    env = AsyncVectorEnv(env_fns=[make_env for _ in range(n_envs)])
+def rollout(actor_id, n_vec_envs, policy, queue, time_steps):
+    env = AsyncVectorEnv(env_fns=[make_sleepy_toy_env for _ in range(n_vec_envs)])
 
     observations = env.reset()
 
@@ -30,12 +30,12 @@ def rollout(actor_id, n_envs, policy, queue, time_steps):
     queue.put(None)
 
 
-def learning(n_envs, policy, queue, n_actors, buffer_capacity):
+def learning(n_vec_envs, policy, queue, n_actors, buffer_capacity):
     replay_buffer_for_parallel_vectorized_envs = ReplayBufferForParallelVectorizedEnvs(
         capacity=buffer_capacity
     )
 
-    episode_rewards = np.zeros((n_envs,))
+    episode_rewards = np.zeros((n_vec_envs,))
     episode_reward_lst = []
     num_train_steps = 0
 
@@ -99,7 +99,7 @@ def learning(n_envs, policy, queue, n_actors, buffer_capacity):
 
 
 def main():
-    n_envs = 4
+    n_vec_envs = 4
     time_steps = 10
     buffer_capacity = 1000
 
@@ -112,22 +112,22 @@ def main():
     print("******************************************")
     print("CPU Cores: {0}".format(n_cpu_cores))
     print("Actors: {0}".format(n_actors))
-    print("Envs per actor: {0}".format(n_envs))
-    print("Total numbers of envs: {0}".format(n_actors * n_envs))
+    print("Envs per actor: {0}".format(n_vec_envs))
+    print("Total numbers of envs: {0}".format(n_actors * n_vec_envs))
     print("******************************************")
 
     actors = []
     for actor_id in range(n_actors):
         actor = Process(
             target=rollout,
-            args=(actor_id, n_envs, policy, queue, time_steps)
+            args=(actor_id, n_vec_envs, policy, queue, time_steps)
         )
         actors.append(actor)
         actor.start()
 
     agent = Process(
         target=learning,
-        args=(n_envs, policy, queue, n_actors, buffer_capacity)
+        args=(n_vec_envs, policy, queue, n_actors, buffer_capacity)
     )
     agent.start()
 

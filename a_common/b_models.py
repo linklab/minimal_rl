@@ -31,7 +31,8 @@ class QNet(nn.Module):
         if coin < epsilon:
             return random.randrange(0, self.n_actions)
         else:
-            return out.argmax().item()  # argmax: 더 큰 값에 대응되는 인덱스 반환
+            action = out.argmax(dim=-1)
+            return action.item()  # argmax: 더 큰 값에 대응되는 인덱스 반환
 
 
 class AtariCNN(nn.Module):
@@ -69,26 +70,17 @@ class AtariCNN(nn.Module):
     def forward(self, x):
         if isinstance(x, np.ndarray):
             x = torch.tensor(x, dtype=torch.float32, device=self.device)
+
         conv_out = self.conv(x)
-        conv_out = torch.flatten(conv_out, 1)
+
+        conv_out = torch.flatten(conv_out, start_dim=1)
         out = self.fc(conv_out)
         return out
 
     def get_action(self, observation, epsilon):
-        def get_gym_action(action):
-            if action == 0:
-                gym_action = 0
-            elif action == 1:
-                gym_action = 2
-            elif action == 2:
-                gym_action = 3
-            else:
-                raise ValueError()
-
-            return gym_action
-
         if random.random() < epsilon:
             action = random.randint(0, 2)
+            return action
         else:
             # Convert to Tensor
             observation = np.array(observation, copy=False)
@@ -100,11 +92,7 @@ class AtariCNN(nn.Module):
 
             q_values = self.forward(observation)
             action = torch.argmax(q_values, dim=1)
-            action = int(action.item())
-
-        gym_action = get_gym_action(action)
-
-        return action, gym_action
+            return action.item()
 
 
 class Policy(nn.Module):

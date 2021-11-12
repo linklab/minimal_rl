@@ -78,7 +78,7 @@ class DQN():
         )
         self.test_env = gym.wrappers.FrameStack(self.test_env, num_stack=4, lz4_compress=True)
 
-        # self.env = make_env(self.env_name)
+        # self.env = make_sleepy_toy_env(self.env_name)
 
         obs_shape = self.env.observation_space.shape
         #n_actions = self.env.action_space.n

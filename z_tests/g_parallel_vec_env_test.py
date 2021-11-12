@@ -4,23 +4,23 @@ import numpy as np
 from gym.vector import SyncVectorEnv, AsyncVectorEnv
 from torch.multiprocessing import Process, cpu_count
 
-from a_common.a_commons import make_env, ParallelVectorizedTransitions
+from a_common.a_commons import make_sleepy_toy_env, ParallelVectorizedTransitions
 from a_common.b_models import Policy
 from a_common.c_buffers import ReplayBufferForParallelVectorizedEnvs
 
 
 class Actor(Process):
-    def __init__(self, actor_id, n_envs, policy, queue, time_steps):
+    def __init__(self, actor_id, n_vec_envs, policy, queue, time_steps):
         super(Actor, self).__init__()
         self.actor_id = actor_id
-        self.n_envs = n_envs
+        self.n_vec_envs = n_vec_envs
         self.policy = policy
         self.queue = queue
         self.time_steps = time_steps
         self.is_vectorized_env_created = mp.Value('i', False)
 
     def run(self):
-        env = AsyncVectorEnv(env_fns=[make_env for _ in range(self.n_envs)])
+        env = AsyncVectorEnv(env_fns=[make_sleepy_toy_env for _ in range(self.n_vec_envs)])
         self.is_vectorized_env_created.value = True
 
         observations = env.reset()
@@ -42,9 +42,9 @@ class Actor(Process):
 
 
 class Learner(Process):
-    def __init__(self, n_envs, policy, queue, n_actors, buffer_capacity):
+    def __init__(self, n_vec_envs, policy, queue, n_actors, buffer_capacity):
         super(Learner, self).__init__()
-        self.n_envs = n_envs
+        self.n_vec_envs = n_vec_envs
         self.policy = policy
         self.queue = queue
         self.n_actors = n_actors
@@ -53,7 +53,7 @@ class Learner(Process):
             capacity=buffer_capacity
         )
 
-        self.episode_rewards = np.zeros((n_envs,))
+        self.episode_rewards = np.zeros((n_vec_envs,))
         self.episode_reward_lst = []
         self.num_train_steps = 0
 
@@ -118,7 +118,7 @@ class Learner(Process):
 
 
 def main():
-    n_envs = 4
+    n_vec_envs = 4
     time_steps = 10
     buffer_capacity = 1000
 
@@ -131,16 +131,16 @@ def main():
     print("******************************************")
     print("CPU Cores: {0}".format(n_cpu_cores))
     print("Actors: {0}".format(n_actors))
-    print("Envs per actor: {0}".format(n_envs))
-    print("Total numbers of envs: {0}".format(n_actors * n_envs))
+    print("Envs per actor: {0}".format(n_vec_envs))
+    print("Total numbers of envs: {0}".format(n_actors * n_vec_envs))
     print("******************************************")
 
     actors = [
         Actor(
-            actor_id, n_envs, policy, queue, time_steps
+            actor_id, n_vec_envs, policy, queue, time_steps
         ) for actor_id in range(n_actors)
     ]
-    learner = Learner(n_envs, policy, queue, n_actors, buffer_capacity)
+    learner = Learner(n_vec_envs, policy, queue, n_actors, buffer_capacity)
 
     for actor in actors:
         actor.start()

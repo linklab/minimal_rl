@@ -1,13 +1,13 @@
 # https://alexandervandekleut.github.io/gym-wrappers/
 import time
 
-from a_common.a_commons import make_env, Transition
+from a_common.a_commons import make_sleepy_toy_env, Transition
 from a_common.b_models import Policy
 from a_common.c_buffers import ReplayBuffer
 
 
 def rl_main():
-    env = make_env()
+    env = make_sleepy_toy_env()
     policy = Policy(n_features=4, n_actions=3)
     replay_buffer = ReplayBuffer(capacity=1000)
 

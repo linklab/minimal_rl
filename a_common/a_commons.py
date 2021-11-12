@@ -3,6 +3,8 @@ import time
 from collections import namedtuple
 import numpy as np
 import gym
+import torch
+from gym.vector import AsyncVectorEnv
 
 Transition = namedtuple(
     typename='Transition',
@@ -86,11 +88,11 @@ class CustomObservationWrapper(gym.ObservationWrapper):
             low=0, high=1, shape=(self.discrete_observation_space_n,)
         )  # [0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]
 
-    def observation(self, obs):  # Observation --> One-hot vector
-        if obs is None:
+    def observation(self, observation):  # Observation --> One-hot vector
+        if observation is None:
             return None
         new_obs = np.zeros(self.discrete_observation_space_n) # [0, 0, 0, 0]
-        new_obs[obs] = 1  # [0, 1, 0, 0]
+        new_obs[observation] = 1  # [0, 1, 0, 0]
         return new_obs
 
 
@@ -115,7 +117,7 @@ class CustomActionWrapper(gym.ActionWrapper):
         return action
 
 
-def make_env():
+def make_sleepy_toy_env():
     # env = SleepyToyEnv()
 
     env = CustomActionWrapper(CustomRewardWrapper(CustomObservationWrapper(
@@ -124,6 +126,15 @@ def make_env():
     return env
 
 
-def make_cart_pole_env():
-    env = gym.make("CartPole-v0")
-    return env
+def make_gym_env(env_name):
+    def _make():
+        env = gym.make(env_name)
+        return env
+
+    return _make
+
+
+def make_gym_vec_env(env_name, n_vec_envs=4):
+    env = AsyncVectorEnv(env_fns=[make_gym_env(env_name) for _ in range(n_vec_envs)])
+    test_env = gym.make(env_name)
+    return env, test_env
