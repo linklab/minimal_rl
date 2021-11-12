@@ -2,14 +2,12 @@ import sys
 import os
 import time
 
-import gym
 import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
 
 import wandb
-from gym.vector import AsyncVectorEnv
 
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
@@ -20,7 +18,7 @@ PROJECT_HOME = os.path.abspath(os.path.join(CURRENT_PATH, os.pardir))
 if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
 
-from a_common.a_commons import make_cart_pole_env, VectorizedTransitions
+from a_common.a_commons import VectorizedTransitions, make_gym_vec_env
 from a_common.b_models import ActorCritic
 from a_common.c_buffers import ReplayBufferForVectorizedEnvs
 
@@ -36,7 +34,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class A2C:
     def __init__(
             self, env_name, n_vec_envs, env, test_env, use_wandb, wandb_entity,
-            max_num_time_steps, learning_rate, gamma, batch_size,
+            max_num_time_steps, batch_size, learning_rate, gamma,
             print_time_step_interval,
             test_training_time_step_interval, test_num_episodes,
             episode_reward_avg_solved, episode_reward_std_solved
@@ -83,19 +81,16 @@ class A2C:
 
     def train_loop(self):
         episode_rewards = np.zeros((self.n_vec_envs,))
-        total_train_start_time = time.time()
-
-        test_episode_reward_avg = 0.0
-        test_episode_reward_std = 0.0
-
-        is_terminated = False
-
-        observations = self.env.reset()
         n_episode = 0
         mean_episode_reward = 0.0
 
         actor_objective = 0.0
         critic_loss = 0.0
+        is_terminated = False
+
+        total_train_start_time = time.time()
+
+        observations = self.env.reset()
 
         while self.time_steps < self.max_num_time_steps:
             actions = self.actor_critic_model.get_action(observations)
@@ -187,6 +182,11 @@ class A2C:
 
         batch = self.buffer_for_vectorized_envs.sample_all()
 
+        # observations.shape: torch.Size([32, 4, 84, 84]),
+        # actions.shape: torch.Size([32, 1]),
+        # next_observations.shape: torch.Size([32, 4, 84, 84]),
+        # rewards.shape: torch.Size([32, 1]),
+        # dones.shape: torch.Size([32])
         observations, actions, next_observations, rewards, dones = batch
 
         self.optimizer.zero_grad()
@@ -223,11 +223,11 @@ class A2C:
 
         action_probs = self.actor_critic_model.pi(observations)
         # print(action_probs.shape, actions.unsqueeze(-1).shape, "!!!!!!!!!1")
-        action_prob_selected = action_probs.gather(dim=1, index=actions.unsqueeze(-1))
+        action_prob_selected = action_probs.gather(dim=1, index=actions)
 
-        # action_prob_selected.shape: (32,)
-        # advantage.shape: (32,)
-        # actor_objectives.shape: (32,)
+        # action_prob_selected.shape: (32, 1)
+        # advantage.shape: (32, 1)
+        # log_pi_advantages.shape: (32, 1)
         log_pi_advantages = torch.multiply(
             torch.log(action_prob_selected), advantages
         )
@@ -287,8 +287,7 @@ def main():
 
     # env
     n_vec_envs = 4
-    env = AsyncVectorEnv(env_fns=[make_cart_pole_env for _ in range(n_vec_envs)])
-    test_env = gym.make(ENV_NAME)
+    env, test_env = make_gym_vec_env(env_name=ENV_NAME, n_vec_envs=n_vec_envs)
 
     a2c = A2C(
         env_name=ENV_NAME,
@@ -298,9 +297,9 @@ def main():
         use_wandb=True,                         # WANDB 연결 및 로깅 유무
         wandb_entity="link-koreatech",          # WANDB 개인 계정
         max_num_time_steps=1_000_000,           # 훈련을 위한 최대 타임 스텝 수
+        batch_size=64,                          # 훈련시 버퍼에서 한번에 가져오는 전체 배치 사이즈
         learning_rate=0.0005,                   # 학습율
         gamma=0.99,                             # 감가율
-        batch_size=64,                         # 훈련시 버퍼에서 한번에 가져오는 랜덤 배치 사이즈
         print_time_step_interval=500,           # 통계 출력에 관한 time_step 간격
         test_training_time_step_interval=100,   # 테스트를 위한 training_time_step 간격
         test_num_episodes=3,                    # 테스트시에 수행하는 에피소드 횟수
