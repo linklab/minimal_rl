@@ -196,7 +196,7 @@ class A2C:
         ###################################
         # next_values.shape: (32, 1)
         next_values = self.actor_critic_model.v(next_observations)
-        td_target_value_lst = list()
+        td_target_value_lst = []
 
         for reward, next_value, done in zip(rewards, next_values, dones):
             td_target = reward + self.gamma * next_value * (0.0 if done else 1.0)
@@ -286,7 +286,7 @@ def main():
     ENV_NAME = "CartPole-v1"
 
     # env
-    n_envs = 2
+    n_envs = 4
     env = AsyncVectorEnv(env_fns=[make_cart_pole_env for _ in range(n_envs)])
     test_env = gym.make(ENV_NAME)
 
@@ -298,7 +298,7 @@ def main():
         use_wandb=True,                         # WANDB 연결 및 로깅 유무
         wandb_entity="link-koreatech",          # WANDB 개인 계정
         max_num_time_steps=1_000_000,           # 훈련을 위한 최대 타임 스텝 수
-        learning_rate=0.0002,                   # 학습율
+        learning_rate=0.0005,                   # 학습율
         gamma=0.99,                             # 감가율
         batch_size=64,                         # 훈련시 버퍼에서 한번에 가져오는 랜덤 배치 사이즈
         print_time_step_interval=500,           # 통계 출력에 관한 time_step 간격

@@ -1,7 +1,6 @@
 import sys
 import os
 import time
-
 import gym
 import numpy as np
 import torch
@@ -25,6 +24,8 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 MODEL_DIR = os.path.join(PROJECT_HOME, "d_REINFORCE", "models")
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class REINFORCE:
@@ -56,7 +57,7 @@ class REINFORCE:
 
         self.buffer = []
 
-        self.policy = Policy()
+        self.policy = Policy(device=DEVICE)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
 
         # init rewards
@@ -71,7 +72,7 @@ class REINFORCE:
         test_episode_reward_avg = 0.0
         test_episode_reward_std = 0.0
 
-        is_terminated = False  # Flag(깃발) Variable
+        is_terminated = False
 
         for n_episode in range(self.max_num_episodes):
             episode_start_time = time.time()
@@ -80,7 +81,7 @@ class REINFORCE:
             # Environment 초기화와 변수 초기화
             observation = self.env.reset()
 
-            done = False  # Flag Variable
+            done = False
 
             while not done:
                 self.time_steps += 1
@@ -95,7 +96,7 @@ class REINFORCE:
                 episode_reward += reward
 
             # TRAIN
-            objective = self.train_step()
+            objective = self.train_step_3()
 
             self.episode_reward_lst.append(episode_reward)
 
@@ -166,19 +167,19 @@ class REINFORCE:
         self.training_time_steps += 1
 
         G = 0
-        policy_gradient = torch.tensor(0.0, dtype=torch.float32)
+        policy_objective = torch.tensor(0.0, dtype=torch.float32)
 
         self.optimizer.zero_grad()
 
-        for r, prob in self.buffer[::-1]:
-            G = r + self.gamma * G
-            policy_gradient += torch.log(prob)
+        for reward, action_prob_selected in self.buffer[::-1]:
+            G = reward + self.gamma * G
+            policy_objective += torch.log(action_prob_selected)
 
-        policy_gradient = torch.multiply(policy_gradient, -1.0 * G)
+        policy_loss = torch.multiply(policy_objective, -1.0 * G)
 
-        policy_gradient.backward()
+        policy_loss.backward()
         self.optimizer.step()
-        self.buffer = []
+        self.buffer.clear()
 
         return G
 
@@ -186,19 +187,44 @@ class REINFORCE:
         self.training_time_steps += 1
 
         G = 0
-        policy_gradient = torch.tensor(0.0, dtype=torch.float32)
+        policy_objective = torch.tensor(0.0, dtype=torch.float32)
 
         self.optimizer.zero_grad()
 
-        for r, prob in self.buffer[::-1]:
-            G = r + self.gamma * G
-            policy_gradient += torch.log(prob) * G
+        for reward, action_prob_selected in self.buffer[::-1]:
+            G = reward + self.gamma * G
+            policy_objective += torch.log(action_prob_selected) * G
 
-        policy_gradient = torch.multiply(policy_gradient, -1.0)
+        policy_loss = torch.multiply(policy_objective, -1.0)
 
-        policy_gradient.backward()
+        policy_loss.backward()
         self.optimizer.step()
         self.buffer = []
+
+        return G
+
+    def train_step_3(self):
+        self.training_time_steps += 1
+
+        rewards, action_probs_selected = zip(*self.buffer)
+
+        self.optimizer.zero_grad()
+
+        G = 0
+        return_lst = []
+        for reward in rewards[::-1]:
+            G = reward + self.gamma * G
+            return_lst.append(G)
+        return_lst = torch.tensor(return_lst[::-1], dtype=torch.float32)
+        action_probs_selected = torch.stack(action_probs_selected)
+
+        log_pi_returns = torch.multiply(torch.log(action_probs_selected), return_lst)
+        policy_objective = torch.sum(log_pi_returns)
+        loss = torch.multiply(policy_objective, -1.0)
+
+        loss.backward()
+        self.optimizer.step()
+        self.buffer.clear()
 
         return G
 

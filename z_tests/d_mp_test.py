@@ -55,13 +55,13 @@ def main():
         actor.start()
         print(learner.n_received.value, "##################")
 
-
     for actor in actors:
         while actor.is_alive():
             actor.join(timeout=1)
 
     while learner.is_alive():
         learner.join(timeout=1)
+
 
 if __name__ == "__main__":
     main()
