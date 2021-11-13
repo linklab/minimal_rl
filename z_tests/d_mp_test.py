@@ -39,7 +39,7 @@ class Learner(Process):
 
 
 def main():
-    queue = mp.SimpleQueue()
+    queue = mp.Queue()
     policy = Policy(n_features=4, n_actions=3)
 
     n_cpu_cores = cpu_count()

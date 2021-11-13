@@ -1,4 +1,4 @@
-from torch.multiprocessing import SimpleQueue, Process
+from torch.multiprocessing import Queue, Process
 
 
 def proc_a(queue):
@@ -15,7 +15,7 @@ if __name__ == '__main__':
     # b = [(1, 2), (20, 30), (200, 300)]
     # print(list(zip(*b)))
 
-    queue = SimpleQueue()
+    queue = Queue()
     p1 = Process(target=proc_a, args=(queue,))
     p2 = Process(target=proc_b, args=(queue,))
 
