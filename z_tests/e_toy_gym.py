@@ -24,7 +24,11 @@ def rl_main():
         next_observation, reward, done, info = env.step(action)
 
         replay_buffer.append(Transition(
-            observation, action, next_observation, reward, done
+            observation=observation,
+            action=action,
+            next_observation=next_observation,
+            reward=reward,
+            done=done
         ))
 
         episode_reward += reward
@@ -42,6 +46,7 @@ def rl_main():
         ))
 
         if done:
+            episode_reward = 0.0
             observation = env.reset()
         else:
             observation = next_observation

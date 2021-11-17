@@ -63,6 +63,16 @@ class ReplayBuffer:
 
 class ReplayBufferForVectorizedEnvs(ReplayBuffer):
     def append(self, vectorized_transitions):
+        """
+        vectorized_transitions
+          - observations: 15개의 observation
+          - actions: 15개의 action
+          - next_observations: 15개의 next_observations
+          - rewards
+          - dones
+        :param vectorized_transitions:
+        :return:
+        """
         for observation, action, next_observation, reward, done in zip(
                 *vectorized_transitions
         ):

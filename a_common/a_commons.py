@@ -46,9 +46,9 @@ class SleepyToyEnv(gym.Env):
         super(SleepyToyEnv, self).__init__()
         self.observation_space = gym.spaces.Discrete(n=4)  # 0, 1, 2, 3
         self.action_space = gym.spaces.Discrete(n=3) # 0, 1, 2
+
         self.current_state = -1
         self.terminal_state = 4
-        self.max_sleep_time = 2
 
     def reset(self):
         self.current_state = 0

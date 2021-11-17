@@ -2,6 +2,7 @@ import time
 
 import numpy as np
 from gym.vector import SyncVectorEnv, AsyncVectorEnv
+import multiprocessing as mp
 
 from a_common.a_commons import VectorizedTransitions, make_sleepy_toy_env
 from a_common.b_models import Policy
@@ -9,7 +10,11 @@ from a_common.c_buffers import ReplayBufferForVectorizedEnvs
 
 
 def rl_main():
-    n_vec_envs = 60
+    num_cores = mp.cpu_count()
+    print("NUM CORES: {0}".format(num_cores))
+    n_vec_envs = num_cores - 1
+    #n_vec_envs = 4
+
     env = AsyncVectorEnv(env_fns=[make_sleepy_toy_env for _ in range(n_vec_envs)])
     policy = Policy(n_features=4, n_actions=3)
 
@@ -18,7 +23,7 @@ def rl_main():
     )
 
     time_steps = 10
-    episode_rewards = np.zeros((n_vec_envs,))
+    episode_rewards = np.zeros((n_vec_envs,)) # [0, 0, 0,...., 0]
     episode_reward_lst = []
     num_train_steps = 0
 
@@ -39,6 +44,7 @@ def rl_main():
         )
         replay_buffer_for_vectorized_envs.append(vectorized_transitions)
 
+        # [0, 0, 0, 0] += [-1.0, -1.0, 10.0, -1.0]
         episode_rewards += rewards
 
         if len(replay_buffer_for_vectorized_envs) > 1:
@@ -54,7 +60,8 @@ def rl_main():
             str(np.array(next_observations).argmax(axis=1)),
             rewards,
             str(dones),
-            replay_buffer_for_vectorized_envs.size(), num_train_steps
+            replay_buffer_for_vectorized_envs.size(),
+            num_train_steps
         ))
 
         if any(dones):
