@@ -2,10 +2,12 @@ import sys
 import os
 import time
 
+import gym
 import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
+from gym.vector import AsyncVectorEnv
 
 import wandb
 
@@ -18,7 +20,7 @@ PROJECT_HOME = os.path.abspath(os.path.join(CURRENT_PATH, os.pardir))
 if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
 
-from a_common.a_commons import VectorizedTransitions, make_gym_vec_env
+from a_common.a_commons import VectorizedTransitions, make_gym_vec_env, make_gym_env
 from a_common.b_models import ActorCritic
 from a_common.c_buffers import ReplayBufferForVectorizedEnvs
 
@@ -285,7 +287,8 @@ def main():
 
     # env
     n_vec_envs = 4
-    env, test_env = make_gym_vec_env(env_name=ENV_NAME, n_vec_envs=n_vec_envs)
+    env = AsyncVectorEnv(env_fns=[make_gym_env(ENV_NAME) for _ in range(n_vec_envs)])
+    test_env = gym.make(ENV_NAME)
 
     a2c = A2C(
         env_name=ENV_NAME,

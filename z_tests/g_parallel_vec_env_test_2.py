@@ -19,8 +19,15 @@ def rollout(actor_id, n_vec_envs, policy, queue, time_steps):
         next_observations, rewards, dones, infos = env.step(actions)
 
         parallel_vectorized_transitions = ParallelVectorizedTransitions(
-            actor_id, time_step,
-            observations, actions, next_observations, rewards, dones, infos
+            actor_id=actor_id,
+            model_version=0,
+            time_step=time_step,
+            observations=observations,
+            actions=actions,
+            next_observations=next_observations,
+            rewards=rewards,
+            dones=dones,
+            infos=infos
         )
 
         queue.put(parallel_vectorized_transitions)
@@ -57,7 +64,8 @@ def learning(n_vec_envs, policy, queue, n_actors, buffer_capacity):
             parallel_vectorized_transitions
         )
 
-        actor_id, time_step, observations, actions, next_observations, rewards, dones, infos = parallel_vectorized_transitions
+        actor_id, model_version, time_step, observations, actions, next_observations, rewards, dones, infos \
+            = parallel_vectorized_transitions
 
         episode_rewards += rewards
 
@@ -65,10 +73,11 @@ def learning(n_vec_envs, policy, queue, n_actors, buffer_capacity):
             # TRAIN POLICY
             num_train_steps += 1
 
-            print("[Actor ID: {0:2}, Time Step: {1:>3}] "
-                  "Observations: {2}, Actions: {3}, Next Observations: {4}, "
-                  "Rewards: {5}, Dones: {6} || Replay Buffer: {7}, Training Steps: {8}".format(
+            print("[Actor ID: {0:2}, Model Version: {1:2}, Time Step: {2:>3}] "
+                  "Observations: {3}, Actions: {4}, Next Observations: {5}, "
+                  "Rewards: {6}, Dones: {7} || Replay Buffer: {8}, Training Steps: {9}".format(
                 actor_id,
+                model_version,
                 time_step + 1,
                 str(np.array(observations).argmax(axis=1)),
                 actions,
