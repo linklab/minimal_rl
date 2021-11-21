@@ -164,7 +164,7 @@ class ActorCritic(nn.Module):
     def pi(self, x):
         x = self.forward(x)
         x = self.fc_pi(x)
-        prob = F.softmax(x, dim=1 if x.dim() == 2 else 0)
+        prob = F.softmax(x, dim=-1)
         return prob
 
     def v(self, x):
@@ -178,6 +178,6 @@ class ActorCritic(nn.Module):
         if mode == "train":
             action = m.sample()
         else:
-            action = torch.argmax(m.probs, dim=1 if action_prob.dim() == 2 else 0)
+            action = torch.argmax(m.probs, dim=-1)
         return action.numpy()
 
