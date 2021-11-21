@@ -63,7 +63,7 @@ class A2C:
         self.test_env = test_env
 
         self.buffer_for_vectorized_envs = ReplayBufferForVectorizedEnvs(
-            capacity=batch_size
+            capacity=batch_size, device=DEVICE
         )
 
         self.actor_critic_model = ActorCritic(
