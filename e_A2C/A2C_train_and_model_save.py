@@ -68,7 +68,7 @@ class A2C:
 
         self.actor_critic_model = ActorCritic(
             n_features=4, n_actions=2, device=DEVICE
-        )
+        ).to(DEVICE)
         self.optimizer = optim.Adam(
             self.actor_critic_model.parameters(), lr=learning_rate
         )
@@ -295,7 +295,7 @@ def main():
         n_vec_envs=n_vec_envs,
         env=env,
         test_env=test_env,
-        use_wandb=True,                         # WANDB 연결 및 로깅 유무
+        use_wandb=False,                         # WANDB 연결 및 로깅 유무
         wandb_entity="link-koreatech",          # WANDB 개인 계정
         max_num_time_steps=1_000_000,           # 훈련을 위한 최대 타임 스텝 수
         batch_size=64,                          # 훈련시 버퍼에서 한번에 가져오는 전체 배치 사이즈

@@ -215,7 +215,9 @@ class REINFORCE:
         for reward in rewards[::-1]:
             G = reward + self.gamma * G
             return_lst.append(G)
-        return_lst = torch.tensor(return_lst[::-1], dtype=torch.float32, device=DEVICE)
+        return_lst = torch.tensor(
+            return_lst[::-1], dtype=torch.float32, device=DEVICE
+        )
         action_probs_selected = torch.stack(action_probs_selected)
 
         log_pi_returns = torch.multiply(torch.log(action_probs_selected), return_lst)
