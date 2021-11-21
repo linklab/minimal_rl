@@ -27,14 +27,14 @@ class QNet(nn.Module):
         return x
 
     def get_action(self, obs, epsilon=0.1):
-        out = self.forward(obs)
-
-        coin = random.random()    # 0.0과 1.0사이의 임의의 값을 반환
-        if coin < epsilon:
-            return np.random.randint(low=0, high=self.n_actions, size=len(obs))
+        # random.random(): 0.0과 1.0사이의 임의의 값을 반환
+        if random.random() < epsilon:
+            action = random.randint(0, 1)
         else:
-            action = out.argmax(dim=1)
-            return action.cpu().numpy()  # argmax: 가장 큰 값에 대응되는 인덱스 반환
+            out = self.forward(obs)
+            action = torch.argmax(out, dim=-1)
+            action = action.item()
+        return action  # argmax: 가장 큰 값에 대응되는 인덱스 반환
 
 
 class AtariCNN(nn.Module):
@@ -131,8 +131,8 @@ class Policy(nn.Module):
         if mode == "train":
             action = m.sample()
         else:
-            action = torch.argmax(m.probs, c)
-        return action.cpu().numpy()
+            action = torch.argmax(m.probs)
+        return action
 
     def get_action_with_action_prob(self, x, mode="train"):
         action_prob = self.forward(x)   # [0.3, 0.7]
@@ -144,7 +144,7 @@ class Policy(nn.Module):
         else:
             action = torch.argmax(m.probs, dim=1 if action_prob.dim() == 2 else 0)
             action_prob_selected = None
-        return action.cpu().numpy(), action_prob_selected
+        return action, action_prob_selected
 
 
 class ActorCritic(nn.Module):
@@ -181,5 +181,5 @@ class ActorCritic(nn.Module):
             action = m.sample()
         else:
             action = torch.argmax(m.probs, dim=-1)
-        return action.cpu().numpy()
+        return action
 
