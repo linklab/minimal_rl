@@ -181,5 +181,5 @@ class ActorCritic(nn.Module):
             action = m.sample()
         else:
             action = torch.argmax(m.probs, dim=-1)
-        return action
+        return action.cpu().numpy()
 
