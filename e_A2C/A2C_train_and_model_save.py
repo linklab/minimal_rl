@@ -206,7 +206,7 @@ class A2C:
 
         # td_target_values.shape: (32, 1)
         td_target_values = torch.tensor(
-            td_target_value_lst, dtype=torch.float32
+            td_target_value_lst, dtype=torch.float32, device=DEVICE
         ).unsqueeze(dim=-1)
 
         # values.shape: (32, 1)
