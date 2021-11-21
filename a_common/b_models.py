@@ -132,7 +132,7 @@ class Policy(nn.Module):
             action = m.sample()
         else:
             action = torch.argmax(m.probs)
-        return action
+        return action.item()
 
     def get_action_with_action_prob(self, x, mode="train"):
         action_prob = self.forward(x)   # [0.3, 0.7]
@@ -144,7 +144,7 @@ class Policy(nn.Module):
         else:
             action = torch.argmax(m.probs, dim=1 if action_prob.dim() == 2 else 0)
             action_prob_selected = None
-        return action, action_prob_selected
+        return action.item(), action_prob_selected
 
 
 class ActorCritic(nn.Module):
