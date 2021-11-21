@@ -10,10 +10,12 @@ from torch.distributions import Categorical
 class QNet(nn.Module):
     def __init__(self, n_features=4, n_actions=2, device=torch.device("cpu")):
         super(QNet, self).__init__()
+        self.n_features = n_features
         self.n_actions = n_actions
         self.fc1 = nn.Linear(n_features, 128)  # fully connected
         self.fc2 = nn.Linear(128, 128)
         self.fc3 = nn.Linear(128, n_actions)
+        self.version = 0
         self.device = device
 
     def forward(self, x):
@@ -27,12 +29,12 @@ class QNet(nn.Module):
     def get_action(self, obs, epsilon=0.1):
         out = self.forward(obs)
 
-        coin = random.random() # 0.0과 1.0사이의 임의의 값을 반환
+        coin = random.random()    # 0.0과 1.0사이의 임의의 값을 반환
         if coin < epsilon:
-            return random.randrange(0, self.n_actions)
+            return np.random.randint(low=0, high=self.n_actions, size=len(obs))
         else:
-            action = out.argmax(dim=-1)
-            return action.item()  # argmax: 더 큰 값에 대응되는 인덱스 반환
+            action = out.argmax(dim=1)
+            return action.numpy()  # argmax: 가장 큰 값에 대응되는 인덱스 반환
 
 
 class AtariCNN(nn.Module):
@@ -129,7 +131,7 @@ class Policy(nn.Module):
         if mode == "train":
             action = m.sample()
         else:
-            action = torch.argmax(m.probs, dim=1 if action_prob.dim() == 2 else 0)
+            action = torch.argmax(m.probs, c)
         return action.numpy()
 
     def get_action_with_action_prob(self, x, mode="train"):

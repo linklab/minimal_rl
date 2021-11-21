@@ -23,7 +23,7 @@ VectorizedTransitions = namedtuple(
 ParallelVectorizedTransitions = namedtuple(
     typename='ParallelVectorizedTransitions',
     field_names=[
-        'actor_id', 'time_step', 'observations', 'actions', 'next_observations',
+        'actor_id', 'model_version', 'time_step', 'observations', 'actions', 'next_observations',
         'rewards', 'dones', 'infos'
     ]
 )
@@ -31,7 +31,7 @@ ParallelVectorizedTransitions = namedtuple(
 NStepParallelVectorizedTransition = namedtuple(
     typename='NStepParallelVectorizedTransition',
     field_names=[
-        'actor_id', 'time_step', 'observation', 'action', 'next_observation',
+        'actor_id', 'model_version', 'time_step', 'observation', 'action', 'next_observation',
         'reward', 'done', 'info'
     ]
 )
@@ -132,9 +132,3 @@ def make_gym_env(env_name):
         return env
 
     return _make
-
-
-def make_gym_vec_env(env_name, n_vec_envs=4):
-    env = AsyncVectorEnv(env_fns=[make_gym_env(env_name) for _ in range(n_vec_envs)])
-    test_env = gym.make(env_name)
-    return env, test_env
