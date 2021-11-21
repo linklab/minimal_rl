@@ -54,7 +54,7 @@ def main_reinforce_play(num_episodes):
 
     env = gym.make(ENV_NAME)
 
-    pi = Policy()
+    pi = Policy(device=DEVICE).to(DEVICE)
     model_params = torch.load(
         os.path.join(MODEL_DIR, "reinforce_CartPole-v1_500.0_0.0.pth")
     )

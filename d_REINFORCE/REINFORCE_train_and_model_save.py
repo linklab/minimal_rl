@@ -57,7 +57,7 @@ class REINFORCE:
 
         self.buffer = []
 
-        self.policy = Policy(device=DEVICE)
+        self.policy = Policy(device=DEVICE).to(DEVICE)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
 
         # init rewards

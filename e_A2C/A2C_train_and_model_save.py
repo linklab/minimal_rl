@@ -20,7 +20,7 @@ PROJECT_HOME = os.path.abspath(os.path.join(CURRENT_PATH, os.pardir))
 if PROJECT_HOME not in sys.path:
     sys.path.append(PROJECT_HOME)
 
-from a_common.a_commons import VectorizedTransitions, make_gym_vec_env, make_gym_env
+from a_common.a_commons import VectorizedTransitions, make_gym_env
 from a_common.b_models import ActorCritic
 from a_common.c_buffers import ReplayBufferForVectorizedEnvs
 

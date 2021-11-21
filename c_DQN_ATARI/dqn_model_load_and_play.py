@@ -56,7 +56,7 @@ def main_q_play(num_episodes):
 
     obs_shape = env.observation_space.shape
     n_actions = 3
-    q = AtariCNN(obs_shape, n_actions).to(DEVICE)
+    q = AtariCNN(obs_shape, n_actions, device=DEVICE).to(DEVICE)
     model_params = torch.load(
         os.path.join(MODEL_DIR, "dqn_PongNoFrameskip-v4_6.0_1.4.pth")
     )

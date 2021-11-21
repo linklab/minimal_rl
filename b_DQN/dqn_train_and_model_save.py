@@ -75,8 +75,8 @@ class DQN():
         self.test_env = test_env
 
         # network
-        self.q = QNet().to(DEVICE)
-        self.target_q = QNet().to(DEVICE)
+        self.q = QNet(device=DEVICE).to(DEVICE)
+        self.target_q = QNet(device=DEVICE).to(DEVICE)
         self.optimizer = optim.Adam(self.q.parameters(), lr=self.learning_rate)
 
         # agent

@@ -55,7 +55,7 @@ def play(env, q, num_episodes):
 def main_q_play(num_episodes):
     env = gym.make(ENV_NAME)
 
-    q = QNet().to(DEVICE)
+    q = QNet(device=DEVICE).to(DEVICE)
     model_params = torch.load(
         os.path.join(MODEL_DIR, "dqn_CartPole-v1_500.0_0.0.pth")
     )
