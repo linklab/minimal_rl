@@ -88,17 +88,6 @@ class DQN():
         self.time_steps = 0
         self.training_time_steps = 0
 
-    def get_action(self, observation, epsilon):
-        if random.random() < epsilon:
-            action = random.randint(0, 1)
-        else:
-            # Convert to Tensor
-            q_values = self.q(observation)
-            action = torch.argmax(q_values, dim=-1)
-            action = int(action.item())
-
-        return action
-
     def epsilon_scheduled(self, current_episode):
         fraction = min(current_episode / self.epsilon_scheduled_last_episode, 1.0)
         epsilon = min(
@@ -128,7 +117,7 @@ class DQN():
             while True:
                 self.time_steps += 1
 
-                action = self.get_action(observation, epsilon)
+                action = self.q.get_action(observation, epsilon)
 
                 # do step in the environment
                 next_observation, reward, done, _ = self.env.step(action)
@@ -284,7 +273,7 @@ class DQN():
             observation = self.test_env.reset()
 
             while True:
-                action = self.get_action(observation, epsilon=0.0)
+                action = self.q.get_action(observation, epsilon=0.0)
 
                 # action을 통해서 next_state, reward, done, info를 받아온다
                 next_observation, reward, done, _ = self.test_env.step(action)
