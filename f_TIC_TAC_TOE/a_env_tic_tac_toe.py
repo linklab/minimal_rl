@@ -8,11 +8,7 @@ PLAYER_1_INT = 1
 PLAYER_2_INT = -1
 
 BOARD_SIZE = 3
-
 BOARD_ROWS = BOARD_COLS = BOARD_SIZE
-
-NUM_ALL_STATES_3_3 = 5_478
-NUM_ALL_STATES_4_4 = 9_722_011
 
 ############################################
 ##  (0,0) -> 7, (0,1) -> 8, (0,2) -> 9    ##
@@ -61,7 +57,7 @@ class State:
             k = 0
             for i in range(self.board_rows):
                 for j in range(self.board_cols):
-                    identifier += self.data[i, j] * BOARD_ROWS ** k
+                    identifier += self.data[i, j] * BOARD_SIZE ** k
                     k += 1
             self.id = identifier
         return self.id
@@ -162,25 +158,13 @@ class TicTacToe:
 
         # 모든 상태가 ‘상태 식별자: 상태’로 관리되는 사전 생성
         # 3x3 Board: number of all states = 5478
-        # [참고] https://math.stackexchange.com/questions/469371/determining-the-number-of-valid-tictactoe-board-states-in-terms-of-board-dimensi
-
-        all_state_file_name = "all_states_{0}_{1}_{2}.pickle".format(
-            BOARD_ROWS, BOARD_COLS, NUM_ALL_STATES_3_3 if BOARD_ROWS == 3 and BOARD_COLS == 3 else NUM_ALL_STATES_4_4
+        self.ALL_STATES = {self.INITIAL_STATE.identifier(): self.INITIAL_STATE}
+        self.generate_all_states(
+            state=self.INITIAL_STATE, player_int=PLAYER_1_INT
         )
-
-        if os.path.isfile(all_state_file_name):
-            with open(all_state_file_name, "rb") as f:
-                self.ALL_STATES = pickle.load(f)
-        else:
-            self.ALL_STATES = {self.INITIAL_STATE.identifier(): self.INITIAL_STATE}
-            self.generate_all_states(
-                state=self.INITIAL_STATE, player_int=PLAYER_1_INT
-            )
-            print("####### Tic-Tac-Toe Env Initialized with {0} States #######".format(
-                len(self.ALL_STATES))
-            )
-            with open(all_state_file_name, "wb") as f:
-                pickle.dump(self.ALL_STATES, f)
+        print("####### Tic-Tac-Toe Env Initialized with {0} States #######".format(
+            len(self.ALL_STATES))
+        )
 
         # for id, state in self.ALL_STATES.items():
         #     print(id, state)
