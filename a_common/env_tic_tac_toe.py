@@ -11,7 +11,7 @@ BOARD_SIZE = 3
 
 BOARD_ROWS = BOARD_COLS = BOARD_SIZE
 
-NUM_ALL_STATES_3_3 = 5478
+NUM_ALL_STATES_3_3 = 5_478
 NUM_ALL_STATES_4_4 = 9_722_011
 
 ############################################
