@@ -229,9 +229,7 @@ class A2C:
         # action_prob_selected.shape: (32, 1)
         # advantage.shape: (32, 1)
         # log_pi_advantages.shape: (32, 1)
-        log_pi_advantages = torch.multiply(
-            torch.log(action_prob_selected), advantages
-        )
+        log_pi_advantages = torch.multiply(torch.log(action_prob_selected), advantages)
 
         # actor_objective.shape: (,) <--  값 1개
         actor_objective = torch.sum(log_pi_advantages)
