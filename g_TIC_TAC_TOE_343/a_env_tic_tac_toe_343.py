@@ -59,7 +59,6 @@ class State:
 
         self.winner = None
         self.id = None  # 게임의 각 상태들을 구분짓기 위한 해시값
-        self.end = None
 
     # 현 상태에서 유효한 행동 ID 리스트 반환
     def get_available_actions(self):
@@ -79,14 +78,16 @@ class State:
                 )
             )
 
+        if len(available_action_ids) == 12:
+            available_action_ids.remove(6)
+            available_action_ids.remove(7)
+
         return available_action_ids
 
     # 플레이어가 종료 상태에 있는지 판단.
     # 플레이어가 게임을 이기거나, 지거나, 비겼다면 True 반환, 그 외는 False 반환
     def is_end_state(self):
-        if self.end is not None:
-            return self.end
-
+        is_end = False
         results = []
 
         # 게임판 가로 3칸 승리조건 확인
@@ -110,24 +111,21 @@ class State:
         # results에는 총 8(=3 + 3 + 1 + 1)개의 값이 원소로 존재함
         # PLAYER_1 또는 PLAYER_2 승리 조건 확인
         for result in results:
-            if result == BOARD_ROWS or result == -BOARD_ROWS:
-                self.end = True
-                if result == BOARD_ROWS:
+            if result == 3 or result == -3:
+                is_end = True
+                if result == 3:
                     self.winner = PLAYER_1_INT
                 else:
                     self.winner = PLAYER_2_INT
-                return self.end
+                return is_end
 
         # 무승부 확인
         sum_values = np.sum(np.abs(self.data))
         if sum_values == self.board_size:
             self.winner = 0
-            self.end = True
-            return self.end
+            is_end = True
 
-        # 게임이 아직 종료되지 않음
-        self.end = False
-        return self.end
+        return is_end
 
     # 게임판 상태 출력
     def get_state_as_board(self):
@@ -236,8 +234,12 @@ class Dummy_Agent:
 
 def main():
     env = TicTacToe343()
+
     state = env.reset()
     observation = state.data.flatten()
+
+    print(state, state.get_available_actions(), observation, "!!!!")
+
     env.render()
 
     agent_1 = Dummy_Agent(name="AGENT_1", env=env)
@@ -258,7 +260,8 @@ def main():
 
         print("[{0}] observation: {1}, action: {2}, next_observation: {3}, reward: {4}, "
               "done: {5}, info: {6}, total_steps: {7}".format(
-            current_agent.name, observation, action, next_observation, reward, done, info, total_steps
+            current_agent.name, observation, action, next_observation, reward,
+            done, info, total_steps
         ))
 
         env.render()

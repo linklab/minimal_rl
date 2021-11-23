@@ -135,8 +135,8 @@ def print_game_statistics(
         game_status.epsilon_list.append(epsilon)
 
     if episode % GAME_STATUS_PRINT_PERIOD_EPISODES == 0:
-        print("### GAMES DONE: {0} | episolon: {1:.2f} | total_steps: {2} | "
-              "agent_1_win : agent_2_win : draw = {3} : {4} : {5} | "
+        print("### GAMES DONE: {0:,} | epsilon: {1:.2f} | total_steps: {2:,} | "
+              "agent_1_win : agent_2_win : draw = {3:,} : {4:,} : {5:,} | "
               "winning_rate_over_recent_100_games --> {6:4.1f}% : {7:4.1f}% : {8:4.1f}%".format(
             episode, epsilon, total_steps,
             game_status.num_player_1_win, game_status.num_player_2_win, game_status.num_draw,
