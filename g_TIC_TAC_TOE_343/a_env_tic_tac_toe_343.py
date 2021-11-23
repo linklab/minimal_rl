@@ -6,31 +6,39 @@ PLAYER_TO_SYMBOL = ['-', 'O', 'X']
 PLAYER_1_INT = 1
 PLAYER_2_INT = -1
 
-BOARD_SIZE = 3
-BOARD_ROWS = BOARD_COLS = BOARD_SIZE
+BOARD_ROWS = 3
+BOARD_COLS = 4
 
-############################################
-##  (0,0) -> 7, (0,1) -> 8, (0,2) -> 9    ##
-##  (1,0) -> 4, (1,1) -> 5, (1,2) -> 6    ##
-##  (2,0) -> 1, (2,1) -> 2, (2,2) -> 3    ##
-############################################
+#########################################################
+##  (0,0) -> 9, (0,1) -> 10, (0,2) -> 11, (0,3) -> 12  ##
+##  (1,0) -> 5, (1,1) ->  6, (1,2) ->  7, (1,3) ->  8  ##
+##  (2,0) -> 1, (2,1) ->  2, (2,2) ->  3, (2,3) ->  4  ##
+#########################################################
 def position_to_action_idx(row_idx, col_idx):
-    for i in range(BOARD_ROWS):
-        for j in range(BOARD_COLS):
-            if row_idx == i and col_idx == j:
-                return ((BOARD_ROWS - 1) - i) * BOARD_ROWS + j + 1
+    if row_idx == 2:
+        return col_idx + 1
+    elif row_idx == 1:
+        return col_idx + 5
+    elif row_idx == 0:
+        return col_idx + 9
+    else:
+        raise ValueError()
 
 
-############################################
-##  7 -> (0,0), 8 -> (0,1), 9 -> (0,2)    ##
-##  4 -> (1,0), 5 -> (1,1), 6 -> (1,2)    ##
-##  1 -> (2,0), 2 -> (2,1), 3 -> (2,2)    ##
-############################################
+#########################################################
+##  9 -> (0,0), 10 -> (0,1), 11 -> (0,2), 12 -> (0,3)  ##
+##  5 -> (1,0),  6 -> (1,1),  7 -> (1,2),  8 -> (1,3)  ##
+##  1 -> (2,0),  2 -> (2,1),  3 -> (2,2),  4 -> (2,3)  ##
+#########################################################
 def action_idx_to_position(idx):
-    i, j = divmod(idx, BOARD_ROWS)
-    i = (BOARD_ROWS - 1) - i if j != 0 else BOARD_ROWS - i
-    j = j - 1 if j != 0 else (BOARD_COLS - 1)
-    return (i, j)
+    if idx in [1, 2, 3, 4]:
+        return 2, idx - 1
+    elif idx in [5, 6, 7, 8]:
+        return 1, idx - 5
+    elif idx in [9, 10, 11, 12]:
+        return 0, idx - 9
+    else:
+        raise ValueError()
 
 
 #########################################################
@@ -45,21 +53,13 @@ class State:
         self.board_cols = board_cols
         self.board_size = board_rows * board_cols
 
-        self.data = np.zeros(shape=[board_rows, board_cols], dtype=int)
+        ### [NOTE] ###
+        self.data = np.zeros(shape=[board_rows, board_cols], dtype=float)
+        ##############
+
         self.winner = None
         self.id = None  # 게임의 각 상태들을 구분짓기 위한 해시값
         self.end = None
-
-    def identifier(self):
-        if self.id is None:
-            identifier = 0
-            k = 0
-            for i in range(self.board_rows):
-                for j in range(self.board_cols):
-                    identifier += self.data[i, j] * BOARD_SIZE ** k
-                    k += 1
-            self.id = identifier
-        return self.id
 
     # 현 상태에서 유효한 행동 ID 리스트 반환
     def get_available_actions(self):
@@ -110,9 +110,9 @@ class State:
         # results에는 총 8(=3 + 3 + 1 + 1)개의 값이 원소로 존재함
         # PLAYER_1 또는 PLAYER_2 승리 조건 확인
         for result in results:
-            if result == BOARD_SIZE or result == -BOARD_SIZE:
+            if result == BOARD_ROWS or result == -BOARD_ROWS:
                 self.end = True
-                if result == BOARD_SIZE:
+                if result == BOARD_ROWS:
                     self.winner = PLAYER_1_INT
                 else:
                     self.winner = PLAYER_2_INT
@@ -133,12 +133,12 @@ class State:
     def get_state_as_board(self):
         board_str = ""
         for i in range(self.board_rows):
-            board_str += '-------------\n'
+            board_str += '-----------------\n'
             out = '| '
             for j in range(self.board_cols):
                 out += PLAYER_TO_SYMBOL[int(self.data[i, j])] + ' | '
             board_str += out + "\n"
-        board_str += '-------------\n'
+        board_str += '-----------------\n'
         return board_str
 
     def __str__(self):
@@ -147,26 +147,13 @@ class State:
 
 ################################################################
 # 플레이어 1,2 간의 게임 진행을 담당하는 Env 클래스
-class TicTacToe:
+class TicTacToe343:
     def __init__(self):
         self.BOARD_SIZE = BOARD_ROWS * BOARD_COLS
         self.current_state = None  # 현재 상태 관리
         self.current_agent_int = None  # 현재 에이전트(플레이어) 관리
 
         self.INITIAL_STATE = State()  # 초기 상태 설정
-
-        # 모든 상태가 ‘상태 식별자: 상태’로 관리되는 사전 생성
-        # 3x3 Board: number of all states = 5478
-        self.ALL_STATES = {self.INITIAL_STATE.identifier(): self.INITIAL_STATE}
-        self.generate_all_states(
-            state=self.INITIAL_STATE, player_int=PLAYER_1_INT
-        )
-        print("####### Tic-Tac-Toe Env Initialized with {0} States #######".format(
-            len(self.ALL_STATES))
-        )
-
-        # for id, state in self.ALL_STATES.items():
-        #     print(id, state)
 
     def reset(self):
         self.current_agent_int = PLAYER_1_INT
@@ -183,10 +170,6 @@ class TicTacToe:
             state_data=self.current_state.data,
             player_int=self.current_agent_int
         )
-
-        next_state_hash = next_state.identifier()
-
-        next_state = self.ALL_STATES[next_state_hash]
 
         done = next_state.is_end_state()
 
@@ -216,30 +199,6 @@ class TicTacToe:
 
     def render(self, mode='human'):
         print(self.current_state.get_state_as_board())
-
-    # 주어진 상태 및 현재 플레이어 심볼에 대하여 발생 가능한 모든 게임 상태 집합 생성
-    def generate_all_states(self, state, player_int):
-        for i in range(BOARD_ROWS):
-            for j in range(BOARD_COLS):
-                if state.data[i][j] == 0:
-                    # 도달 가능한 새로운 상태 생성
-                    new_state = self.get_new_state(
-                        i, j, state.data, player_int
-                    )
-
-                    # 새로운 상태의 해시값 가져오기
-                    new_hash = new_state.identifier()
-
-                    if new_hash not in self.ALL_STATES:
-                        # 모든 게임 상태 집합 갱신
-                        self.ALL_STATES[new_hash] = new_state
-                        if len(self.ALL_STATES) % 10000 == 0: print(len(self.ALL_STATES))
-                        # 게임 상태가 종료 상태가 아닌 경우
-                        # 재귀 호출로 새로운 상태 생성 계속 지속
-                        if not new_state.is_end_state():
-                            self.generate_all_states(
-                                new_state, -1 * player_int
-                            )
 
     def get_new_state(self, i, j, state_data, player_int):
         new_state = State()
@@ -276,8 +235,9 @@ class Dummy_Agent:
 
 
 def main():
-    env = TicTacToe()
+    env = TicTacToe343()
     state = env.reset()
+    observation = state.data.flatten()
     env.render()
 
     agent_1 = Dummy_Agent(name="AGENT_1", env=env)
@@ -294,14 +254,17 @@ def main():
         action = current_agent.get_action(state)
 
         next_state, reward, done, info = env.step(action)
+        next_observation = next_state.data.flatten()
 
-        print("[{0}] action: {1}, reward: {2}, done: {3}, info: {4}, total_steps: {5}".format(
-            current_agent.name, action, reward, done, info, total_steps
+        print("[{0}] observation: {1}, action: {2}, next_observation: {3}, reward: {4}, "
+              "done: {5}, info: {6}, total_steps: {7}".format(
+            current_agent.name, observation, action, next_observation, reward, done, info, total_steps
         ))
 
         env.render()
 
         state = next_state
+        observation = next_observation
         time.sleep(2)
 
         if current_agent == agent_1:
