@@ -35,11 +35,14 @@ class Actor(Process):
             actions = self.policy.get_action(observations)
             next_observations, rewards, dones, infos = env.step(actions)
 
+            print(observations, actions, next_observations, rewards, dones, infos, "!!!")
+
             for env_idx, (observation, action, next_observation, reward, done, info) in enumerate(
                     zip(observations, actions, next_observations, rewards, dones, infos)
             ):
+                model_version = 0
                 histories[env_idx].append(NStepParallelVectorizedTransition(
-                    self.actor_id, time_step,
+                    self.actor_id, model_version, time_step,
                     observation, action, next_observation, reward, done, info
                 ))
 
@@ -47,19 +50,23 @@ class Actor(Process):
 
                 if len(histories[env_idx]) == self.n_step or done:
                     n_step_transitions = tuple(histories[env_idx])
-                    if n_step_transitions[-1].done:
-                        next_observation = None
-                        done = True
-                    else:
-                        next_observation = n_step_transitions[-1].next_observation
-                        done = False
+                    next_observation = n_step_transitions[-1].next_observation
+
+                    # if n_step_transitions[-1].done:
+                    #     done = True
+                    # else:
+                    #     done = False
 
                     n_step_reward = 0.0
                     for n_step_transition in reversed(n_step_transitions):
-                        n_step_reward = n_step_transition.reward + self.gamma * n_step_reward
+                        n_step_reward = n_step_transition.reward + \
+                                        self.gamma * n_step_reward * (0.0 if n_step_transition.done else 1.0)
+                        if n_step_transition.done:
+                            break
 
                     n_step_transition = NStepParallelVectorizedTransition(
                         self.actor_id,
+                        model_version,
                         n_step_transitions[0].time_step,
                         n_step_transitions[0].observation,
                         n_step_transitions[0].action,
@@ -112,7 +119,7 @@ class Learner(Process):
 
             self.replay_buffer.append(n_step_transition)
 
-            actor_id, time_step, observation, action, next_observation, reward, done, info = n_step_transition
+            actor_id, model_version, time_step, observation, action, next_observation, reward, done, info = n_step_transition
 
             self.episode_reward += reward
 
@@ -121,9 +128,9 @@ class Learner(Process):
                 self.num_train_steps += 1
 
             print("[Actor ID: {0:2}, Time Step: {1:>3}] "
-                  "Observation: {1}, Action: {2}, Next Observation: {3:14}, "
-                  "Reward: {4}, Done: {5:5} || "
-                  "Replay Buffer: {6}, Training Steps: {7}".format(
+                  "Observation: {2}, Action: {3}, Next Observation: {4:14}, "
+                  "Reward: {5}, Done: {6:5} || "
+                  "Replay Buffer: {7}, Training Steps: {8}".format(
                 actor_id,
                 time_step + 1,
                 str(observation), action, str(next_observation), reward, str(done),
@@ -148,17 +155,18 @@ class Learner(Process):
 
 
 def main():
-    n_vec_envs = 4
+    n_vec_envs = 1
     time_steps = 10
     buffer_capacity = 1000
-    n_step = 2
+    n_step = 3
     gamma = 0.99
 
     queue = mp.Queue()
     policy = Policy(n_features=4, n_actions=3)
 
     n_cpu_cores = cpu_count()
-    n_actors = n_cpu_cores - 1
+    # n_actors = n_cpu_cores - 1
+    n_actors = 3
 
     print("******************************************")
     print("CPU Cores: {0}".format(n_cpu_cores))

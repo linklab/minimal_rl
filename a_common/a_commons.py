@@ -23,16 +23,16 @@ VectorizedTransitions = namedtuple(
 ParallelVectorizedTransitions = namedtuple(
     typename='ParallelVectorizedTransitions',
     field_names=[
-        'actor_id', 'model_version', 'time_step', 'observations', 'actions', 'next_observations',
-        'rewards', 'dones', 'infos'
+        'actor_id', 'model_version', 'time_step',
+        'observations', 'actions', 'next_observations', 'rewards', 'dones', 'infos'
     ]
 )
 
 NStepParallelVectorizedTransition = namedtuple(
     typename='NStepParallelVectorizedTransition',
     field_names=[
-        'actor_id', 'model_version', 'time_step', 'observation', 'action', 'next_observation',
-        'reward', 'done', 'info'
+        'actor_id', 'model_version', 'time_step',
+        'observation', 'action', 'next_observation', 'reward', 'done', 'info'
     ]
 )
 
@@ -45,7 +45,7 @@ class SleepyToyEnv(gym.Env):
     def __init__(self):
         super(SleepyToyEnv, self).__init__()
         self.observation_space = gym.spaces.Discrete(n=4)  # 0, 1, 2, 3
-        self.action_space = gym.spaces.Discrete(n=3) # 0, 1, 2
+        self.action_space = gym.spaces.Discrete(n=3)  # 0, 1, 2
 
         self.current_state = -1
         self.terminal_state = 4
