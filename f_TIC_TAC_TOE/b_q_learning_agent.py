@@ -121,9 +121,12 @@ class Q_Learning_Agent:
         return td_error
 
     # 주어진 정책에 기반하여 현재 상태에서의 행동 산출
-    def get_action(self, current_state):
+    def get_action(self, current_state, mode="TRAIN"):
         action_ids, action_probs = self.policy[current_state.identifier()]
-        action_id = np.random.choice(action_ids, size=1, p=action_probs)[0]
+        if mode == "TRAIN":
+            action_id = np.random.choice(action_ids, size=1, p=action_probs)[0]
+        else:
+            action_id = action_ids[np.argmax(action_probs)]
         return action_id
 
     # 완전 탐욕적 정책으로 업데이트
