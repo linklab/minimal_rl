@@ -8,10 +8,10 @@ from f_TIC_TAC_TOE.e_game_stats import draw_performance, print_game_statistics, 
 
 INITIAL_EPSILON = 1.0
 FINAL_EPSILON = 0.01
-LAST_SCHEDULED_EPISODES = 50000
+LAST_SCHEDULED_EPISODES = 50_000
 
 # 최대 반복 에피소드(게임) 횟수
-MAX_EPISODES = 200000
+MAX_EPISODES = 200_000
 
 STEP_VERBOSE = False
 BOARD_RENDER = False

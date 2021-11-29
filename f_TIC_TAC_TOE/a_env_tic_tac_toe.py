@@ -158,7 +158,9 @@ class TicTacToe:
 
         # 모든 상태가 ‘상태 식별자: 상태’로 관리되는 사전 생성
         # 3x3 Board: number of all states = 5478
-        self.ALL_STATES = {self.INITIAL_STATE.identifier(): self.INITIAL_STATE}
+        self.ALL_STATES = {
+            self.INITIAL_STATE.identifier(): self.INITIAL_STATE
+        }
         self.generate_all_states(
             state=self.INITIAL_STATE, player_int=PLAYER_1_INT
         )
