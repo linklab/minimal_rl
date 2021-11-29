@@ -1,6 +1,7 @@
 import time
 import numpy as np
-import random
+
+from f_TIC_TAC_TOE.d_dummy_agent import Dummy_Agent
 
 PLAYER_TO_SYMBOL = ['-', 'O', 'X']
 PLAYER_1_INT = 1
@@ -264,15 +265,9 @@ class TicTacToe:
         print('-------------')
 
 
-class Dummy_Agent:
-    def __init__(self, name, env):
-        self.name = name
-        self.env = env
 
-    def get_action(self, state):
-        available_action_ids = state.get_available_actions()
-        action_id = random.choice(available_action_ids)
-        return action_id
+
+
 
 
 def main():
