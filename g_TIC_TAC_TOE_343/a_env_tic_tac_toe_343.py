@@ -2,6 +2,8 @@ import time
 import numpy as np
 import random
 
+from g_TIC_TAC_TOE_343.b_dummy_agent import Dummy_Agent
+
 PLAYER_TO_SYMBOL = ['-', 'O', 'X']
 PLAYER_1_INT = 1
 PLAYER_2_INT = -1
@@ -10,33 +12,33 @@ BOARD_ROWS = 3
 BOARD_COLS = 4
 
 #########################################################
-##  (0,0) -> 9, (0,1) -> 10, (0,2) -> 11, (0,3) -> 12  ##
-##  (1,0) -> 5, (1,1) ->  6, (1,2) ->  7, (1,3) ->  8  ##
-##  (2,0) -> 1, (2,1) ->  2, (2,2) ->  3, (2,3) ->  4  ##
+##  (0,0) -> 8, (0,1) ->  9, (0,2) -> 10, (0,3) -> 11  ##
+##  (1,0) -> 4, (1,1) ->  5, (1,2) ->  6, (1,3) ->  7  ##
+##  (2,0) -> 0, (2,1) ->  1, (2,2) ->  2, (2,3) ->  3  ##
 #########################################################
 def position_to_action_idx(row_idx, col_idx):
     if row_idx == 2:
-        return col_idx + 1
+        return col_idx
     elif row_idx == 1:
-        return col_idx + 5
+        return col_idx + 4
     elif row_idx == 0:
-        return col_idx + 9
+        return col_idx + 8
     else:
         raise ValueError()
 
 
 #########################################################
-##  9 -> (0,0), 10 -> (0,1), 11 -> (0,2), 12 -> (0,3)  ##
-##  5 -> (1,0),  6 -> (1,1),  7 -> (1,2),  8 -> (1,3)  ##
-##  1 -> (2,0),  2 -> (2,1),  3 -> (2,2),  4 -> (2,3)  ##
+##  8 -> (0,0),  9 -> (0,1), 10 -> (0,2), 11 -> (0,3)  ##
+##  4 -> (1,0),  5 -> (1,1),  6 -> (1,2),  7 -> (1,3)  ##
+##  0 -> (2,0),  1 -> (2,1),  2 -> (2,2),  3 -> (2,3)  ##
 #########################################################
 def action_idx_to_position(idx):
-    if idx in [1, 2, 3, 4]:
-        return 2, idx - 1
-    elif idx in [5, 6, 7, 8]:
-        return 1, idx - 5
-    elif idx in [9, 10, 11, 12]:
-        return 0, idx - 9
+    if idx in [0, 1, 2, 3]:
+        return 2, idx
+    elif idx in [4, 5, 6, 7]:
+        return 1, idx - 4
+    elif idx in [8, 9, 10, 11]:
+        return 0, idx - 8
     else:
         raise ValueError()
 
@@ -54,12 +56,10 @@ class State:
         self.board_size = board_rows * board_cols
 
         ### [NOTE] ###
-        self.data = np.zeros(shape=[board_rows, board_cols], dtype=float)
+        self.data = np.zeros(shape=[board_rows, board_cols], dtype=int)
         ##############
 
         self.winner = None
-        self.id = None  # 게임의 각 상태들을 구분짓기 위한 해시값
-        self.end = None
 
     # 현 상태에서 유효한 행동 ID 리스트 반환
     def get_available_actions(self):
@@ -68,7 +68,7 @@ class State:
         else:
             available_positions = [
                 (i, j) for i in range(BOARD_ROWS)
-                       for j in range(BOARD_COLS) if self.data[i, j] == 0
+                for j in range(BOARD_COLS) if self.data[i, j] == 0
             ]
 
         available_action_ids = []
@@ -79,55 +79,50 @@ class State:
                 )
             )
 
+        if len(available_action_ids) == 12:
+            available_action_ids.remove(6)
+            available_action_ids.remove(7)
+
         return available_action_ids
 
     # 플레이어가 종료 상태에 있는지 판단.
     # 플레이어가 게임을 이기거나, 지거나, 비겼다면 True 반환, 그 외는 False 반환
     def is_end_state(self):
-        if self.end is not None:
-            return self.end
+        data_flat = self.data.flatten()
 
-        results = []
+        # 14 win condition idx
+        seq3_list = [[0,  1,  2],  # horizontal
+                     [1,  2,  3],
+                     [4,  5,  6],
+                     [5,  6,  7],
+                     [8,  9, 10],
+                     [9, 10, 11],
+                     [0,  4,  8],  # vertical
+                     [1,  5,  9],
+                     [2,  6, 10],
+                     [3,  7, 11],
+                     [0,  5, 10],  # diagonal
+                     [1,  6, 11],
+                     [2,  5,  8],
+                     [3,  6,  9]]
 
-        # 게임판 가로 3칸 승리조건 확인
-        for i in range(self.board_rows):
-            results.append(np.sum(self.data[i, :]))
+        # Check if the match is over
+        for seq3 in seq3_list:
+            if data_flat[seq3[0]] == 0:
+                continue
 
-        # 게임판 세로 3칸 승리조건 확인
-        for i in range(self.board_cols):
-            results.append(np.sum(self.data[:, i]))
+            if data_flat[seq3[0]] == data_flat[seq3[1]] == data_flat[seq3[2]]:
+                self.winner = data_flat[seq3[0]]
+                return True
 
-        # 게임판의 두 개 대각선에 대 대각선 3칸 승리조건 확인
-        trace = 0
-        reverse_trace = 0
-        for i in range(self.board_rows):
-            trace += self.data[i, i]
-            reverse_trace += self.data[i, self.board_rows - 1 - i]
+        # Check if the match continues
+        for i in data_flat:
+            if i == 0:
+                return False
 
-        results.append(trace)
-        results.append(reverse_trace)
-
-        # results에는 총 8(=3 + 3 + 1 + 1)개의 값이 원소로 존재함
-        # PLAYER_1 또는 PLAYER_2 승리 조건 확인
-        for result in results:
-            if result == BOARD_ROWS or result == -BOARD_ROWS:
-                self.end = True
-                if result == BOARD_ROWS:
-                    self.winner = PLAYER_1_INT
-                else:
-                    self.winner = PLAYER_2_INT
-                return self.end
-
-        # 무승부 확인
-        sum_values = np.sum(np.abs(self.data))
-        if sum_values == self.board_size:
-            self.winner = 0
-            self.end = True
-            return self.end
-
-        # 게임이 아직 종료되지 않음
-        self.end = False
-        return self.end
+        # Draw
+        self.winner = 0
+        return True
 
     # 게임판 상태 출력
     def get_state_as_board(self):
@@ -223,21 +218,14 @@ class TicTacToe343:
         print('-------------')
 
 
-class Dummy_Agent:
-    def __init__(self, name, env):
-        self.name = name
-        self.env = env
-
-    def get_action(self, state):
-        available_action_ids = state.get_available_actions()
-        action_id = random.choice(available_action_ids)
-        return action_id
-
-
 def main():
     env = TicTacToe343()
+
     state = env.reset()
     observation = state.data.flatten()
+
+    print(state, state.get_available_actions(), observation, "!!!!")
+
     env.render()
 
     agent_1 = Dummy_Agent(name="AGENT_1", env=env)
@@ -258,7 +246,8 @@ def main():
 
         print("[{0}] observation: {1}, action: {2}, next_observation: {3}, reward: {4}, "
               "done: {5}, info: {6}, total_steps: {7}".format(
-            current_agent.name, observation, action, next_observation, reward, done, info, total_steps
+            current_agent.name, observation, action, next_observation, reward,
+            done, info, total_steps
         ))
 
         env.render()

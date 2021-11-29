@@ -82,8 +82,7 @@ class Q_Learning_Agent:
         action_probs = []
 
         # 현재 상태에서 수행가능한 모든 행동 취합
-        available_action_ids = \
-            self.env.ALL_STATES[state_id].get_available_actions()
+        available_action_ids = self.env.ALL_STATES[state_id].get_available_actions()
         num_available_actions = len(available_action_ids)
 
         # 각 수행가능한 행동별로 epsilon-탐욕적 정책 갱신
@@ -91,8 +90,7 @@ class Q_Learning_Agent:
             action_ids.append(available_position)
             if available_position in max_prob_actions:
                 action_probs.append(
-                    (1 - epsilon) / len(max_prob_actions) \
-                        + epsilon / num_available_actions
+                    (1 - epsilon) / len(max_prob_actions) + epsilon / num_available_actions
                 )
             else:
                 action_probs.append(
@@ -109,8 +107,7 @@ class Q_Learning_Agent:
         if done:
             target_value = reward
         else:
-            target_value = reward + \
-                    GAMMA * max(self.q_table[next_state.identifier()].values())
+            target_value = reward + GAMMA * max(self.q_table[next_state.identifier()].values())
 
         td_error = target_value - self.q_table[state.identifier()][action_id]
         self.q_table[state.identifier()][action_id] += ALPHA * td_error

@@ -1,27 +1,40 @@
-from f_TIC_TAC_TOE.a_env_tic_tac_toe import TicTacToe
-from f_TIC_TAC_TOE.b_q_learning_agent import Q_Learning_Agent
-from f_TIC_TAC_TOE.c_human_agent import Human_Agent
-from f_TIC_TAC_TOE.d_dummy_agent import Dummy_Agent
-from f_TIC_TAC_TOE.e_game_stats import draw_performance, print_game_statistics, print_step_status, GameStatus, \
-    epsilon_scheduled
+# 선수 에이전트: RL 에이전트, 후수 에이전트: Dummy 에이전트
+from g_TIC_TAC_TOE_343.c_human_agent import Human_Agent
+from g_TIC_TAC_TOE_343.b_dummy_agent import Dummy_Agent
+from g_TIC_TAC_TOE_343.f_game_stats import draw_performance, print_game_statistics, print_step_status, \
+    epsilon_scheduled, GameStatus
+from g_TIC_TAC_TOE_343.a_env_tic_tac_toe_343 import TicTacToe343
+from g_TIC_TAC_TOE_343.e_a2c_agent import TTTAgentA2c
+from g_TIC_TAC_TOE_343.e_dqn_agent import TTTAgentDqn
+from g_TIC_TAC_TOE_343.e_reinforce_agent import TTTAgentReinforce
 
 INITIAL_EPSILON = 1.0
 FINAL_EPSILON = 0.01
-LAST_SCHEDULED_EPISODES = 50000
+LAST_SCHEDULED_EPISODES = 50_000
 
 # 최대 반복 에피소드(게임) 횟수
-MAX_EPISODES = 100000
+MAX_EPISODES = 100_000
 
 STEP_VERBOSE = False
 BOARD_RENDER = False
 
 
 # 선수 에이전트: Q-Learning 에이전트, 후수 에이전트: Dummy 에이전트
-def q_learning_for_agent_1_vs_dummy():
+def learning_for_agent_1_vs_dummy():
     game_status = GameStatus()
-    env = TicTacToe()
+    env = TicTacToe343()
 
-    agent_1 = Q_Learning_Agent(name="AGENT_1", env=env)
+    agent_1 = TTTAgentDqn(
+        name="AGENT_1", env=env, gamma=0.99, learning_rate=0.001,
+        replay_buffer_size=10_000, batch_size=32, target_sync_step_interval=500,
+        min_buffer_size_for_training=100
+    )
+    # agent_1 = TTTAgentReinforce(
+    #     name="AGENT_1", env=env, gamma=0.99, learning_rate=0.001
+    # )
+    # agent_1 = TTTAgentA2c(
+    #     name="AGENT_1", env=env, gamma=0.99, learning_rate=0.001, batch_size=32
+    # )
     agent_2 = Dummy_Agent(name="AGENT_2", env=env)
 
     total_steps = 0
@@ -53,7 +66,7 @@ def q_learning_for_agent_1_vs_dummy():
             if done:
                 # reward: agent_1이 착수하여 done=True
                 # agent_1이 이기면 1.0, 비기면 0.0
-                agent_1_episode_td_error += agent_1.q_learning(
+                agent_1_episode_td_error += agent_1.learning(
                     state, action, None, reward, done, epsilon
                 )
 
@@ -74,7 +87,7 @@ def q_learning_for_agent_1_vs_dummy():
                 if done:
                     # reward: agent_2가 착수하여 done=True
                     # agent_2가 이기면 -1.0, 비기면 0.0
-                    agent_1_episode_td_error += agent_1.q_learning(
+                    agent_1_episode_td_error += agent_1.learning(
                         state, action, None, reward, done, epsilon
                     )
 
@@ -84,7 +97,7 @@ def q_learning_for_agent_1_vs_dummy():
                         game_status, agent_1, agent_2
                     )
                 else:
-                    agent_1_episode_td_error += agent_1.q_learning(
+                    agent_1_episode_td_error += agent_1.learning(
                         state, action, next_state, reward, done, epsilon
                     )
 
@@ -95,13 +108,14 @@ def q_learning_for_agent_1_vs_dummy():
     draw_performance(game_status, MAX_EPISODES)
 
     # 훈련 종료 직후 완전 탐욕적으로 정책 설정
-    agent_1.make_greedy_policy()
+    # 아래 내용 불필요 --> agent_1.get_action(state, epsilon=0.0)으로 해결 가능
+    # agent_1.make_greedy_policy()
 
     return agent_1
 
 
 def play_with_agent_1(agent_1):
-    env = TicTacToe()
+    env = TicTacToe343()
     env.print_board_idx()
     state = env.reset()
 
@@ -147,5 +161,5 @@ def play_with_agent_1(agent_1):
 
 
 if __name__ == '__main__':
-    trained_agent_1 = q_learning_for_agent_1_vs_dummy()
+    trained_agent_1 = learning_for_agent_1_vs_dummy()
     play_with_agent_1(trained_agent_1)
