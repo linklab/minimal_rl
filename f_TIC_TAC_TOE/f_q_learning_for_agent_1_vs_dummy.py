@@ -92,7 +92,6 @@ def q_learning_for_agent_1_vs_dummy():
 
         game_status.set_agent_1_episode_td_error(agent_1_episode_td_error)
 
-    game_status.agent_1_count_state_updates = agent_1.count_state_updates
     draw_performance(game_status, MAX_EPISODES)
 
     # 훈련 종료 직후 완전 탐욕적으로 정책 설정

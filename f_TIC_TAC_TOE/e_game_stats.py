@@ -28,9 +28,6 @@ class GameStatus:
         self.player_2_win_rate_over_100_games = []
         self.draw_rate_over_100_games = []
 
-        self.agent_1_count_state_updates = None
-        self.agent_2_count_state_updates = None
-
     def set_agent_1_episode_td_error(self, agent_1_episode_td_error):
         self.agent_1_episode_td_error.append(agent_1_episode_td_error)
 

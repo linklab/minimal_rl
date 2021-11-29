@@ -126,8 +126,6 @@ def q_learning_for_self_play():
         game_status.set_agent_1_episode_td_error(agent_1_episode_td_error)
         game_status.set_agent_2_episode_td_error(agent_2_episode_td_error)
 
-    game_status.agent_1_count_state_updates = self_agent_1.count_state_updates
-    game_status.agent_2_count_state_updates = self_agent_2.count_state_updates
     draw_performance(game_status, MAX_EPISODES)
 
     # 훈련 종료 직후 완전 탐욕적으로 정책 설정
@@ -146,9 +144,6 @@ def self_play(self_agent):
 
     agent_1 = self_agent
     agent_2 = self_agent
-
-    agent_2.q_table = agent_1.q_table
-    agent_2.policy = agent_1.policy
 
     current_agent = agent_1
 

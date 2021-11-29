@@ -29,7 +29,7 @@ class QNet(nn.Module):
     def get_action(self, obs, epsilon=0.1):
         # random.random(): 0.0과 1.0사이의 임의의 값을 반환
         if random.random() < epsilon:
-            action = random.randint(0, 1)
+            action = random.randrange(0, self.n_actions)
         else:
             out = self.forward(obs)
             action = torch.argmax(out, dim=-1)

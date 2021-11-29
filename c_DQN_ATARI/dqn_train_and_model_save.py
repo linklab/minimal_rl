@@ -69,6 +69,7 @@ class DQN:
         # network
         self.q = AtariCNN(obs_shape, n_actions, device=DEVICE).to(DEVICE)
         self.target_q = AtariCNN(obs_shape, n_actions, device=DEVICE).to(DEVICE)
+        self.target_q.load_state_dict(self.q.state_dict())
         self.optimizer = optim.Adam(self.q.parameters(), lr=self.learning_rate)
 
         # agent
